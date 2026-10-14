@@ -545,6 +545,9 @@
   height: 176px;
   object-fit: contain;
 }
+.vehicle-breadcrumb {
+  padding-inline-start: calc(var(--gutter) + 200px);
+}
 .footer-brand {
   display: block;
   width: 180px;
@@ -561,6 +564,9 @@
     width: 132px;
     height: 132px;
     top: -6px;
+  }
+  .vehicle-breadcrumb {
+    padding-inline-start: calc(var(--gutter) + 152px);
   }
   .footer-brand {
     width: 152px;
