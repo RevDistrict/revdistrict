@@ -37,8 +37,10 @@ Upload `src/`, `public/`, `.next/`, `package.json`, `package-lock.json`, `next.c
 
 ## Launch sequence
 
+The October 14 provider conversation confirms dealership-owned hosting and SFTP delivery. Follow [the current inventory handoff](DEALR-INVENTORY.md); the preferred financing integration is now dealr.cloud's iframe, which has not arrived. Keep the native financial relay disabled unless separately approved. The dependency audit findings recorded in that handoff must also be resolved before deployment.
+
 1. Connect and validate the dealer-authorized inventory adapter and lead relay on a staging origin.
-2. Connect and test the approved financial relay for `/financing/apply`, obtain dealer/provider approval of disclosures and mapping, and then enable `FINANCE_APPLICATION_ENABLED`. Application input remains disabled until that connection is configured; no old-domain application fallback remains. See `INTEGRATIONS.md` for the acceptance contract.
+2. Obtain and integrate the approved dealr.cloud credit iframe at `/financing/apply`, including allowed domains, vehicle association and provider-confirmed receipt testing. This is still pending; do not enable the existing native financial relay as a substitute without a separate provider decision. See `INTEGRATIONS.md` for the existing relay contract if that alternative is chosen.
 3. Confirm the new domain, business email, logo treatment, phone/hours and legal copy with the dealer.
 4. Replace the two temporary video slots if the new films are ready. Review captions and posters.
 5. Configure HTTPS, environment variables, trusted proxy headers and shared abuse protection. Disable request-body capture in proxy, server and monitoring logs; verify no lead or financial payloads appear. Confirm encrypted storage and access controls at the provider/relay.

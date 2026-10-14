@@ -2,6 +2,8 @@
 
 The app is a working Next.js build. It is not yet connected to RevDistrict's production DMS or deployed to the dealership domain. No production messages were sent while building it.
 
+**October 14 update:** dealr.cloud supplied its CSV headers and confirmed hourly exports to a dealership-provided FTP/SFTP destination. The CSV adapter, SFTP import command and private snapshot reader are implemented. See [the current dealr.cloud handoff](DEALR-INVENTORY.md) for commands, assumptions and outstanding provider questions. The agreed financing direction is now a provider iframe; the native relay implementation described below remains disabled pending a separate decision.
+
 ## Inventory: keep dealr.cloud as the source of truth
 
 The preview contains 262 vehicles captured from the public dealer site on September 23, 2026, including original photos, prices, mileage, specifications, descriptions and equipment. These are review data, not a live feed. Preview pages label this clearly and are noindex by default. All old vehicle paths resolve through the catch-all route, including slashes and punctuation in trim names.
@@ -19,7 +21,7 @@ Sources, checked September 23, 2026:
 
 `src/lib/inventory.ts` loads a server-only HTTPS JSON endpoint from `INVENTORY_FEED_URL`, optionally using `INVENTORY_FEED_TOKEN` as a bearer credential. A Zod contract in `src/lib/vehicle.ts` validates it; only active records display. Responses are cached for five minutes. Missing configuration uses the clearly labeled preview. A configured but failed, invalid, or older-than-36-hours feed raises the page's designed error state instead of silently substituting the preview.
 
-**The normalized JSON contract is ours. It is not a claimed dealr.cloud API schema.** After their actual export format is supplied, create one adapter that maps their feed into this contract. This may be a scheduled SFTP importer and HTTPS read endpoint, or a direct authenticated endpoint if offered. No undocumented private API or marketplace scraper is used. The existing website was only read to prepare this one-time preview.
+**The normalized JSON contract is ours. It is not a claimed dealr.cloud API schema.** `npm run inventory:import` now maps the supplied CSV columns into that contract, reading a local delivery file or downloading through verified SFTP. `INVENTORY_FILE_PATH` lets the site consume the resulting private snapshot without a separate HTTPS adapter service. The existing HTTPS feed remains an alternative. See [the current importer handoff](DEALR-INVENTORY.md) before enabling live imports; only a header-only sample was available. No undocumented private API or marketplace scraper is used.
 
 The feed envelope is:
 
@@ -50,7 +52,7 @@ Request:
 4. An approved lead-delivery method, field mapping, test destination, CRM attribution, optional SMS-consent support, and confirmation semantics.
 5. An approved integration for the new on-site credit application: financial-data endpoint or supported relay, authentication, field mapping, applicant/co-applicant handling, authorization wording/version, test destination and durable receipt semantics. Confirm how applications attach to inventory and CRM records.
 
-Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test feed before launch. Agree the sold-vehicle policy: currently removed active records render 404 and offer inventory navigation. A sold archive/410 response can be added if the dealer wants it.
+Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test feed before launch. Agree the sold-vehicle policy: removed records render the noindex not-found page and offer inventory navigation (404 before streaming, or a streamed 200 response). A sold archive/410 response can be added if the dealer wants it.
 
 Scraping Facebook or KSL back into this site is not the recommended architecture. It would make downstream listings the source of truth and add duplication and stale-availability problems. Feed marketplaces outward from dealr.cloud as they do today.
 

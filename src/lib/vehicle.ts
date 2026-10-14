@@ -39,6 +39,7 @@ export const vehicleSchema = z.object({
 export const inventorySchema = z.object({
   capturedAt: z.iso.datetime(),
   source: z.string().max(500),
+  isPreview: z.boolean().default(false),
   vehicles: z.array(vehicleSchema).max(1000),
 });
 export type Vehicle = z.infer<typeof vehicleSchema>;

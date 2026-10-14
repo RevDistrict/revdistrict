@@ -1,6 +1,16 @@
 # Verification and review handoff
 
-Latest revision checked September 29, 2026 against the compiled Next.js application, served through the included `server.cjs`. The review preview is running at **http://localhost:3001**. To restart it: `npm run build`, then `PORT=3001 node server.cjs`. Normal development uses `npm run dev` at http://localhost:3000.
+## October 14 CSV/SFTP integration
+
+The supplied dealr.cloud file has 58 headers and no populated vehicles. The importer was checked using two synthetic rows with those headers. Nineteen unit/domain tests, TypeScript, ESLint, formatting and the production build passed. `npm run test:inventory` verifies the actual importer against a temporary local SFTP server, including host-key rejection, stale-file rejection, stalled shutdown/lock cleanup, private snapshot loading, price updates without rebuilding, slug redirects, removal and preview labeling. It is included in CI after the build. Unit tests used `node --import tsx --test tests/*.test.ts` because the sandbox blocks the tsx CLI's IPC socket.
+
+The compiled site was opened in Chrome at http://localhost:3005/inventory. The two imported vehicles, preview banner, Acura detail specifications, ordered gallery and canonical redirect were checked; the main vehicle image was visually inspected. This was a data integration review, not a new full-site responsive/accessibility audit. The existing full browser and financial-relay suites were not rerun for this change.
+
+The fresh-agent simplicity review found the adapter/CLI/file-reader split appropriate. Its two findings—valid image proxy URLs being rejected and potentially unbounded SFTP shutdown—were fixed and covered by regression checks. The production SFTP connection remains untested because credentials and a populated provider export have not arrived. Eight high-severity findings in existing dependencies were recorded as a launch blocker; no exception was granted and no deployment occurred. See [the current handoff and review commands](DEALR-INVENTORY.md).
+
+## Previous review environment
+
+The September 29 revision was checked against the compiled Next.js application through `server.cjs` at http://localhost:3001. Normal development uses `npm run dev` at http://localhost:3000.
 
 ## September 29 website revision
 

@@ -43,7 +43,7 @@ export function SectionHeading({
 export function PreviewNotice({ inline = false }: { inline?: boolean }) {
   return (
     <p className={inline ? "preview-note" : "preview-banner"}>
-      <span className="status-dot" /> Inventory preview · September 23, 2026.
+      <span className="status-dot" /> Inventory preview · Not live inventory.
       Call to confirm current price and availability.
     </p>
   );
