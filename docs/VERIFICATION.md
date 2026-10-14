@@ -1,5 +1,13 @@
 # Verification and review handoff
 
+## October 14 security-audit follow-up
+
+[GitHub run 38629393404](https://github.com/xianwilliams/revdistrict/actions/runs/38629393404) passed formatting, types, lint, unit tests, the production build and both integration suites. Its only failed step was `npm audit --audit-level=high`.
+
+Updated Next.js and its ESLint configuration from 16.3.6 to 16.3.8, sharp from 0.35.4 to 0.35.5, and source-map-js from 1.2.1 to 1.2.2. The production audit (`npm audit --omit=dev --audit-level=high`) now reports zero vulnerabilities. Formatting, lint, TypeScript, all 19 unit tests, the production build, local SFTP inventory checks and the HTTPS/browser integration suite pass with these versions. This patch changes dependency versions only; the fresh-agent simplicity review was skipped for that contained change. No new manual visual review was performed.
+
+The full audit still fails on [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): the development-only chain `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. npm counts the one underlying advisory across five affected packages. No patched braces version is published. npm's proposed fix downgrades the Next.js lint configuration to 14.2.35; that is not a compatible maintenance update for this Next.js 16 project. The existing lint configuration does not accept external root-directory glob patterns. CI retains the full audit and its failure threshold, no security exception was granted, and the remaining finding is still a launch blocker.
+
 ## October 14 CSV/SFTP integration
 
 The supplied dealr.cloud file has 58 headers and no populated vehicles. The importer was checked using two synthetic rows with those headers. Nineteen unit/domain tests, TypeScript, ESLint, formatting and the production build passed. `npm run test:inventory` verifies the actual importer against a temporary local SFTP server, including host-key rejection, stale-file rejection, stalled shutdown/lock cleanup, private snapshot loading, price updates without rebuilding, slug redirects, removal and preview labeling. It is included in CI after the build. Unit tests used `node --import tsx --test tests/*.test.ts` because the sandbox blocks the tsx CLI's IPC socket.
