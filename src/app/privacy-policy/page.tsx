@@ -18,22 +18,21 @@ export default function PrivacyPage() {
           submit a vehicle for valuation or consignment, you may provide your
           name, email, phone number, message, preferred appointment time, and
           vehicle information. We use this information to respond to your
-          request and help with the services you ask about.
+          request and help with the services you ask about. Submitted inquiries
+          are sent through our email delivery provider to the dealership’s
+          dealr.cloud lead inbox. This website does not store inquiry contents
+          in a database or application logs.
         </p>
         <h2>Financing applications</h2>
         <p>
-          When online applications are available, the on-site credit application
-          collects identity and contact details, residence and employment
-          history, income, and optional co-applicant, vehicle and trade
-          information. Only after you authorize and submit it, the application
-          is forwarded through an authenticated connection to the approved
-          financing processor. Unsubmitted applications are not saved by this
-          website. Application contents are not stored in this website’s
-          database, browser storage or application logs. The dealership and
-          financing providers retain received applications under their
-          applicable policies. Do not send Social Security numbers, bank
-          information, or copies of identity documents through the general
-          contact form.
+          The credit application embedded on this site is hosted by dealr.cloud
+          for The Used Car Factory. Information you enter there is handled by
+          that provider and the dealership under the disclosures shown in the
+          application. This website’s contact-form server does not receive or
+          forward the credit application. Contact the dealership about
+          application retention, access and corrections. Do not send Social
+          Security numbers, bank information, or copies of identity documents
+          through the general contact form.
         </p>
         <h2>Service providers and sharing</h2>
         <p>

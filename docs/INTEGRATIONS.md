@@ -2,7 +2,7 @@
 
 The app is a working Next.js build. It is not yet connected to RevDistrict's production DMS or deployed to the dealership domain. No production messages were sent while building it.
 
-**October 14 update:** dealr.cloud supplied its CSV headers and confirmed hourly exports to a dealership-provided FTP/SFTP destination. The CSV adapter, SFTP import command and private snapshot reader are implemented. See [the current dealr.cloud handoff](DEALR-INVENTORY.md) for commands, assumptions and outstanding provider questions. The agreed financing direction is now a provider iframe; the native relay implementation described below remains disabled pending a separate decision.
+**October 14 update:** Adam confirmed full active-inventory CSV exports hourly under the same filename and supplied the credit iframe and ADF destination. The CSV/SFTP importer, provider iframe and ADF email delivery are implemented. Hosting/SFTP access, a populated export, SMTP credentials and provider-confirmed receipts remain outstanding. See [the inventory handoff](DEALR-INVENTORY.md).
 
 ## Inventory: keep dealr.cloud as the source of truth
 
@@ -45,74 +45,39 @@ Ask the production provider for stable, cacheable HTTPS image URLs and documente
 
 Ask Buddy to arrange the dealr.cloud introduction. The conversation screenshots establish that he offered to help; they are not permission to send messages or use the private phone numbers in those screenshots.
 
-Request:
-1. An authorized inventory export for a custom Next.js website, its format, authentication/delivery method and update frequency.
-2. A sample with photos in display order, VIN/stock/provider ID, legacy website slug, price, mileage, features/equipment, disclosures, CARFAX links, and active/sold/inactive status.
-3. Full-feed versus delta semantics, sold/deleted vehicle handling, image rights/URLs, expected inventory size and error monitoring.
-4. An approved lead-delivery method, field mapping, test destination, CRM attribution, optional SMS-consent support, and confirmation semantics.
-5. An approved integration for the new on-site credit application: financial-data endpoint or supported relay, authentication, field mapping, applicant/co-applicant handling, authorization wording/version, test destination and durable receipt semantics. Confirm how applications attach to inventory and CRM records.
+Remaining provider/host requests:
+1. A populated export, exact CSV path, DealerID, delivery access and completed-upload convention.
+2. Confirmation of photo/option separators, promotional-price precedence and old/new vehicle-ID correspondence.
+3. An SMTP account and verified sending address, a safe ADF test destination, and confirmation that each inquiry type reaches the correct dealership workflow.
+4. Confirmation that the supplied credit iframe is approved for the final domain, plus a provider-authorized application receipt test and any supported vehicle-prefill parameters.
 
 Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test feed before launch. Agree the sold-vehicle policy: removed records render the noindex not-found page and offer inventory navigation (404 before streaming, or a streamed 200 response). A sold archive/410 response can be added if the dealer wants it.
 
 Scraping Facebook or KSL back into this site is not the recommended architecture. It would make downstream listings the source of truth and add duplication and stale-availability problems. Feed marketplaces outward from dealr.cloud as they do today.
 
-## Leads and forms
+## Leads: ADF email to dealr.cloud
 
-Contact, trade valuation, consignment, text-back, vehicle inquiry, and test-drive forms post to `/api/leads`. Browser and server validation check required information, consent, phone and email; the server checks origin, request size and content type, applies a honeypot and a bounded in-process rate limit, and sends only to a configured HTTPS relay. The text-back form requires a phone and explicit text consent instead of an email. No submissions are stored locally or logged. Tests use fictional data and isolated responses.
+Contact, trade valuation, consignment, text-back, vehicle inquiry and test-drive forms all post to `/api/leads`. The server retains origin/content-type checks, bounded request validation, consent requirements, honeypot and in-process rate limiting. `src/lib/adf.ts` maps every intent to the supplied ADF 1.0 specification. `src/lib/adf-delivery.ts` sends it through authenticated, certificate-verified SMTP using Nodemailer. No lead contents are stored locally or logged.
 
-Configure `LEAD_WEBHOOK_URL` and optionally `LEAD_WEBHOOK_TOKEN` for the dealer-approved relay. The JSON body is a `Lead` from `src/lib/leads.ts`, plus an ID, source and timestamp. The request includes the same ID as `Idempotency-Key`. The relay must accept durably before returning 2xx and deduplicate that key. Map it to dealr.cloud's confirmed API/ADF/email method only after their specifications are known. A timed-out relay is reported as unconfirmed delivery, not success; do not automatically retry.
+Adam supplied `dealer-the-used-car-factory@leads.dealrcloud.com` in his [October 14 reply](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d). It is the default destination. `ADF_LEAD_TO` allows a host-controlled, dealer-approved destination or isolated test inbox; visitors cannot choose recipients. Josh noted that the dealership may want particular routing, so confirm the inbox and CRM assignment with them before launch.
 
-Map `intent: "consignment"` as a selling consultation with the existing vehicle fields; it is not a signed consignment agreement. Map `intent: "text"` as a request for a text response, preserving `textConsent: true`; this is not automatic SMS delivery. General contact consent and optional SMS consent must remain distinct. No consignment price, commission, guaranteed sale or financing approval is generated by this site.
+Configure `SITE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` in the host's environment. `SMTP_FROM` is a single verified email address whose bounces the dealership monitors. Port 465 uses implicit TLS; other ports require STARTTLS. Certificate verification cannot be disabled by an application setting. Use an SMTP provider that enforces encrypted onward delivery to the lead mailbox; STARTTLS here protects the website-to-SMTP hop. The host must verify that provider's onward TLS policy, storage encryption, retention, access controls and sender-domain SPF/DKIM/DMARC configuration. No provider account is created by this code.
 
-Without a relay, the endpoint returns 503 and the form offers the dealer's existing phone and email. There is no fake success state. Test-drive submission requests a time; it never promises a confirmed appointment.
+Each message has a generated reference in its Message-ID and ADF prospect ID, a brief text part, and an `application/xml` attachment named `lead.xml`, as specified in the supplied ADF transfer mechanism. The ADF contains contact details, request intent, customer message, separate contact/text consent and requested test-drive date/time. Inquiry vehicle facts (ID, VIN, stock, year/make/model) come from server inventory rather than browser-supplied names. Customer trade/consignment information is identified separately. General inquiries or unavailable inventory leave required vehicle facts empty instead of inventing a vehicle; confirm those messages import correctly with dealr.cloud. Consignment is a selling consultation, not a signed agreement; text-back requests preserve SMS consent but do not send an SMS automatically.
 
-Before production, use the host's trusted reverse proxy configuration and shared edge/WAF rate limiting. The in-process limiter is appropriate for the local preview and a single process; it does not coordinate multiple replicas, and forwarded IPs must be sanitized by the host. Confirm relay data retention, access controls and encryption. No credit-application data, SSNs, bank details, or driver's licenses are collected in these forms.
+Missing or invalid SMTP configuration returns 503 and offers the existing phone/email. A positive response is returned only after SMTP accepts the message. SMTP acceptance is not proof of CRM ingestion; bounces and provider-confirmed receipts must be checked during handoff. Rejection or timeout returns an unconfirmed-delivery response and reference; there are no automatic retries. Remove obsolete `LEAD_WEBHOOK_URL` / `LEAD_WEBHOOK_TOKEN` configuration.
 
-The current public business email is retained until the owners supply a rebrand address. Do not substitute personal contacts from the supplied conversation.
+Before production, configure trusted proxy headers and shared edge/WAF abuse protection. The in-process limiter does not coordinate replicas. Keep request-body capture disabled in hosting and monitoring. No financial application data belongs in these general inquiry forms. The public business contact email remains unchanged.
 
-## Financing: native application with a dedicated provider connection
+## Financing: provider-hosted credit application
 
-All application links now stay at `/financing/apply`; vehicle pages preserve `?entry_id=<provider ID>`. `/financing/terms` explains the authorization, and `/privacy-policy` reflects the implemented data paths. The payment estimator remains browser-only and does not perform a credit check or submit its calculator values.
+The existing `/financing/apply` route embeds Adam's supplied `https://staging.dealr.website/39984`, titled **Credit Application**, with a responsive frame and direct new-tab fallback. Despite its hostname, this is the exact provider-supplied URL; do not guess a production replacement. Confirm allowed domains and final URL with dealr.cloud before launch. `/apply` and `/credit-application` continue redirecting to the existing route.
 
-The public legacy application and its public form script were re-inspected September 24, 2026. The recreated field groups are identity/contact/DOB/SSN/license/bankruptcy, residence and housing payment, employment and monthly income, previous residence/employment when current tenure is under two years, the same groups for an optional co-applicant, optional trade details, vehicle interest, cash down and a message. The new flow separates applicant/co-applicant authorization and optional text consent. Shared validation and conditional fields live in `src/lib/finance-application.ts`.
+Vehicle-page links retain `?entry_id=<provider ID>` for context on our page. Because no vehicle-prefill API was supplied, the page tells the visitor which vehicle to choose inside the provider application. It does not append undocumented query parameters or claim automatic vehicle association. The application continues to work when inventory is unavailable.
 
-The old script posts to relative `functions/submitFinanceAppForm` and `functions/submitContactForm` paths. These are **not a documented or approved third-party API**. This build does not post to them, bypass their controls, or claim a connection to dealr.cloud. The new normalized submission contract must be mapped through the provider's approved method. There is no generic email fallback for financial data.
+The custom credit form, financial schema/configuration and relay have been removed. `POST /api/finance` returns 410 without reading or forwarding a body, protecting old clients from using the retired flow. Remove old `FINANCE_APPLICATION_ENABLED`, `FINANCE_WEBHOOK_URL` and `FINANCE_WEBHOOK_TOKEN` settings. The provider iframe owns collection, validation, authorizations and delivery; this website's API receives no application fields. `/financing/terms` directs visitors to the provider's current disclosures, and `/privacy-policy` describes this arrangement. The page remains noindex, no-store and no-referrer. The calculator remains browser-only.
 
-### Enable only after the provider handoff
-
-The application is reviewable but sensitive fields and submission remain disabled until all of these are configured on the server:
-
-```dotenv
-SITE_URL=https://your-approved-domain.example
-FINANCE_APPLICATION_ENABLED=true
-FINANCE_WEBHOOK_URL=https://your-approved-finance-relay.example/applications
-FINANCE_WEBHOOK_TOKEN=your-host-managed-secret
-```
-
-Use the host's secret settings, never client/public variables. The financial relay must be HTTPS and authenticated; local HTTP `SITE_URL` is allowed only for localhost fixture testing. Configure the normal lead relay separately. Remove obsolete `FINANCE_APPLICATION_URL` settings from old deployments.
-
-`POST /api/finance` validates the exact site origin, JSON content type, a bounded 32 KB body, required/conditional fields, consents, honeypot and rate limit. It discards inactive co-applicant/history/trade fields before forwarding. A native POST fallback prevents unhydrated forms from putting information in a URL; JavaScript is needed to complete the guided flow. The application page is noindex, no-store and no-referrer. It has no analytics or session replay.
-
-The relay receives an authenticated JSON request with an `Idempotency-Key` matching `id`:
-
-```json
-{
-  "id": "generated-reference",
-  "submittedAt": "ISO timestamp",
-  "source": "RevDistrict credit application",
-  "termsVersion": "2026-09-24",
-  "application": {
-    "application_type": "individual",
-    "acceptance_of_terms": "yes"
-  }
-}
-```
-
-The shortened example omits personal fields; use the shared schema for the full contract. Most original source field names are preserved for mapping, but this envelope is ours. A successful relay must durably accept and deduplicate the request, then return 2xx JSON **`{"accepted": true}`**. Only then does the website show a receipt and clear the form. A timeout, redirect, rejected response or missing acceptance returns an unconfirmed state and a reference; the visitor is asked to call before resubmitting. No automatic retries or credit-approval claims are made.
-
-Unsubmitted information exists only in component memory. Unlike the old script, this form does not save incomplete identity/contact details to browser storage or transmit partial applications. The website does not persist financial application bodies to files, a database or logs. Logs include only a delivery event and reference. Keep request-body capture disabled in hosting, observability and proxy tooling as well.
-
-Before setting the enabled flag, the dealer/provider must confirm the field mapping, actual lender-routing behavior, accepted disclosure/authorization text, retention/access controls, encrypted storage at the receiver, trusted proxy and shared abuse protection, and a provider-confirmed test receipt. This local implementation and its synthetic fixture tests do not establish provider approval or legal compliance. No real credit application was submitted during development.
+No real application or lead was submitted during development. `npm run test:integrations` uses a local HTTPS inventory feed and authenticated STARTTLS SMTP fixture, and intercepts the provider frame with local test content. Provider receipt and its own form's accessibility/behavior require separate authorized checks.
 
 ## Video replacement
 

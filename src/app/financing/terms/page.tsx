@@ -1,10 +1,6 @@
 import { Motion } from "@/components/motion";
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  financeAuthorization,
-  financeTermsVersion,
-} from "@/lib/finance-application";
 import { site } from "@/lib/site";
 export const metadata: Metadata = { title: "Credit Application Terms" };
 export default function FinanceTerms() {
@@ -14,12 +10,17 @@ export default function FinanceTerms() {
       <h1>Application terms.</h1>
       <p className="legal-intro">
         Please review this information before submitting a credit application.
-        Each person named on a joint application must review and accept the
-        authorization.
+        The application contains the dealership’s current terms and
+        authorizations.
       </p>
       <article>
-        <h2>Your authorization</h2>
-        <p>{financeAuthorization}</p>
+        <h2>Review the application’s terms</h2>
+        <p>
+          The Used Car Factory’s credit application is provided through
+          dealr.cloud. Review its disclosures, privacy information and
+          authorizations before entering and submitting your information. Those
+          terms are displayed within the application itself.
+        </p>
         <h2>What happens after you apply</h2>
         <p>
           The dealership and its approved financing providers review the
@@ -48,14 +49,12 @@ export default function FinanceTerms() {
         </p>
         <h2>Communication and corrections</h2>
         <p>
-          The team may contact you about your application. Text-message consent
-          is separate and optional. If you need to correct information or are
-          unsure whether an application was received, call{" "}
-          <a href={site.phoneHref}>{site.phone}</a> before submitting again. Do
-          not email Social Security numbers or other sensitive financial
-          information.
+          The team may contact you about your application. If you need to
+          correct information or are unsure whether an application was received,
+          call <a href={site.phoneHref}>{site.phone}</a> before submitting
+          again. Do not email Social Security numbers or other sensitive
+          financial information.
         </p>
-        <p className="mono">Authorization version: {financeTermsVersion}</p>
         <Link className="button button--gold" href="/financing/apply">
           Go to the application
         </Link>

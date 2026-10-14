@@ -2,6 +2,13 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const car = "/inventory/2024-acura-integra-a-spec-technology/1173076";
 test.beforeEach(async ({ page }) => {
+  // Exercise our wrapper without contacting or submitting to the live credit provider.
+  await page.route("https://staging.dealr.website/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><html lang='en'><title>Provider fixture</title><main><h1>Provider application fixture</h1></main></html>",
+    }),
+  );
   await page.addInitScript(() => {
     Element.prototype.requestPointerLock = () => Promise.resolve();
     Element.prototype.setPointerCapture = () => {};
@@ -408,30 +415,25 @@ test("client priorities are prominent and financing stays on RevDistrict", async
   }
 });
 
-test("unconfigured application is reviewable without collecting financial information", async ({
+test("credit application uses the supplied provider iframe without native financial fields", async ({
   page,
 }) => {
-  const applicationPage = await page.goto("/financing/apply?entry_id=1173076");
-  expect(applicationPage?.headers()["referrer-policy"]).toBe("no-referrer");
-  expect(applicationPage?.headers()["cache-control"]).toContain("no-store");
+  const response = await page.goto("/financing/apply?entry_id=1173076");
+  expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+  expect(response?.headers()["cache-control"]).toContain("no-store");
   await expect(
-    page.getByText("Online applications are being connected."),
-  ).toBeVisible();
+    page.locator('iframe[title="Credit Application"]'),
+  ).toHaveAttribute("src", "https://staging.dealr.website/39984");
+  await expect(page.locator('input[name*="ssn"]')).toHaveCount(0);
+  await expect(page.locator(".credit-application-note")).toContainText(
+    "Acura Integra",
+  );
   await expect(
-    page.getByLabel("Social Security number *", { exact: true }),
-  ).toBeDisabled();
-  await page.getByLabel("Joint application", { exact: true }).check();
-  await page.getByRole("button", { name: /Co-applicant/ }).click();
-  await expect(
-    page.getByLabel("Social Security number *", { exact: true }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: /Vehicle & review/ }).click();
-  await expect(
-    page.getByRole("button", { name: "Submit application" }),
-  ).toBeDisabled();
-  await expect(page.getByLabel("Vehicle of interest")).toHaveValue("1173076");
-  const response = await page.request.post("/api/finance", { data: {} });
-  expect(response.status()).toBe(503);
+    page.getByRole("link", { name: "Open application in a new tab" }),
+  ).toHaveAttribute("href", "https://staging.dealr.website/39984");
+  expect((await page.request.post("/api/finance", { data: {} })).status()).toBe(
+    410,
+  );
 });
 
 test("consignment and text-back forms use their own lead intents", async ({

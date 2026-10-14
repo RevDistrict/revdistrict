@@ -1,5 +1,17 @@
 # Verification and review handoff
 
+## October 14 latest provider email: iframe and ADF
+
+Read all nine messages in the **New Website & FTP Feed** thread, including [Adam’s 20:19 UTC reply](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d), and the supplied ADF example/specification. `/financing/apply` now embeds his exact credit-application URL. The old native credit collection/relay was removed; its endpoint returns 410. All six inquiry types share the new authenticated TLS SMTP/ADF adapter and the supplied dealership destination. Inventory setup now records confirmed full Active exports hourly with the same filename. Configuration and outstanding host/provider checks are in `INTEGRATIONS.md`.
+
+Validation passed: TypeScript, lint, formatting, production build, 19 unit/domain tests, the local SFTP inventory suite and the updated HTTPS/SMTP/browser integration suite. All 24 website browser tests passed, including automated accessibility checks on the site-owned pages. Tests intercept the credit provider; they do not audit the provider’s form or send live leads/applications. The actual provider iframe was separately loaded and visually inspected in Chrome at desktop width and 390px, with its fields empty. It rendered inside the site at both sizes. No financial application was entered or submitted.
+
+The fresh reviewer found the mapping/delivery split appropriately small. Its SMTP finding was reproduced: without `forceAuth`, an AUTH-less TLS relay accepted a lead (201) when the test expected rejection (502). Authentication is now forced and that regression passes. The reviewer’s other suggestions—use the existing color token and skip inventory loading when there is no selected vehicle—were applied.
+
+The production audit reports zero vulnerabilities. The full audit still reports the existing unpatched development-only braces advisory across five packages; the CI audit remains unchanged. Live email delivery is not configured: the host must provide SMTP credentials and a verified sender, confirm onward TLS and mailbox routing, and verify dealr.cloud receives each inquiry type. SFTP access and a populated real export are also still outstanding. No DNS change or deployment occurred.
+
+Review locally at http://localhost:3006/financing/apply while the preview server is running, or run `npm run dev` and use http://localhost:3000/financing/apply. Open a vehicle’s financing link to check its context, inspect the provider form and new-tab fallback on desktop/phone, then review contact, inquiry/test-drive, trade, consignment and text-back forms. Do not submit a live credit application as a routine development check.
+
 ## October 14 security-audit follow-up
 
 [GitHub run 38629393404](https://github.com/xianwilliams/revdistrict/actions/runs/38629393404) passed formatting, types, lint, unit tests, the production build and both integration suites. Its only failed step was `npm audit --audit-level=high`.

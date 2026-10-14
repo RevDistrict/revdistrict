@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { SMTPServer } from "smtp-server";
 import { createServer } from "node:https";
 import { createServer as createTcpServer } from "node:net";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -8,14 +9,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 
-// Exercises the compiled app against isolated HTTPS fixtures, never a dealer service.
+// All submitted data and SMTP/HTTPS destinations are isolated local fixtures.
 const dir = await mkdtemp(join(tmpdir(), "revdistrict-integration-"));
-let app;
-let fixture;
-let browser;
+let app, fixture, smtp, browser;
+let logs = "";
+const received = [];
+let rejectLead = false;
 try {
-  const key = join(dir, "key.pem");
-  const cert = join(dir, "cert.pem");
+  const key = join(dir, "key.pem"),
+    cert = join(dir, "cert.pem");
   execFileSync(
     "openssl",
     [
@@ -37,6 +39,7 @@ try {
     ],
     { stdio: "ignore" },
   );
+  const tls = { key: await readFile(key), cert: await readFile(cert) };
   const preview = JSON.parse(
     await readFile("src/data/inventory-preview.json", "utf8"),
   );
@@ -51,110 +54,142 @@ try {
     mileage: 0,
     status: "active",
   };
-  const received = [];
-  let rejectLead = false;
-  let rejectFinance = false;
-  const receivedFinance = [];
-  fixture = createServer(
-    { key: await readFile(key), cert: await readFile(cert) },
-    async (req, res) => {
-      assert.equal(req.headers.authorization, "Bearer local-test-only");
-      res.setHeader("Content-Type", "application/json");
-      if (req.url === "/feed") {
-        res.end(
-          JSON.stringify({
-            capturedAt: new Date().toISOString(),
-            source: "Local test fixture",
-            vehicles: [
-              vehicle,
-              {
-                ...vehicle,
-                id: "fixture-sold",
-                name: "Sold fixture",
-                status: "sold",
-              },
-            ],
-          }),
-        );
-        return;
-      }
-      let body = "";
-      for await (const chunk of req) body += chunk;
-      if (req.url === "/finance") {
-        receivedFinance.push({
-          body: JSON.parse(body),
-          idempotencyKey: req.headers["idempotency-key"],
-        });
-        res.statusCode = 200;
-        res.end(JSON.stringify({ accepted: !rejectFinance }));
-        return;
-      }
-      received.push({
-        body: JSON.parse(body),
-        idempotencyKey: req.headers["idempotency-key"],
-      });
-      res.statusCode = rejectLead ? 500 : 202;
-      res.end(JSON.stringify({ accepted: !rejectLead }));
-    },
-  );
-  await new Promise((resolve) => fixture.listen(0, "127.0.0.1", resolve));
-  const fixtureUrl = `https://127.0.0.1:${fixture.address().port}`;
-  const portProbe = createTcpServer();
-  await new Promise((resolve) => portProbe.listen(0, "127.0.0.1", resolve));
-  const port = portProbe.address().port;
-  await new Promise((resolve) => portProbe.close(resolve));
-  const origin = `http://localhost:${port}`;
-  app = spawn(process.execPath, ["server.cjs"], {
-    env: {
-      ...process.env,
-      PORT: String(port),
-      SITE_URL: origin,
-      SITE_INDEXABLE: "false",
-      NODE_EXTRA_CA_CERTS: cert,
-      INVENTORY_FEED_URL: `${fixtureUrl}/feed`,
-      INVENTORY_FEED_TOKEN: "local-test-only",
-      LEAD_WEBHOOK_URL: `${fixtureUrl}/leads`,
-      LEAD_WEBHOOK_TOKEN: "local-test-only",
-      FINANCE_APPLICATION_ENABLED: "true",
-      FINANCE_WEBHOOK_URL: `${fixtureUrl}/finance`,
-      FINANCE_WEBHOOK_TOKEN: "local-test-only",
-    },
-    stdio: "ignore",
+  fixture = createServer(tls, (req, res) => {
+    assert.equal(req.headers.authorization, "Bearer local-test-only");
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        capturedAt: new Date().toISOString(),
+        source: "Local test fixture",
+        vehicles: [vehicle, { ...vehicle, id: "fixture-sold", status: "sold" }],
+      }),
+    );
   });
-  let ready = false;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      await fetch(`${origin}/api/leads`);
-      ready = true;
-      break;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => fixture.listen(0, "127.0.0.1", resolve));
+  smtp = new SMTPServer({
+    ...tls,
+    secure: false,
+    logger: false,
+    onAuth(auth, session, callback) {
+      assert.ok(session.secure, "SMTP authentication requires TLS");
+      if (
+        auth.username !== "fixture-user" ||
+        auth.password !== "fixture-password"
+      )
+        return callback(new Error("Invalid fixture credentials"));
+      callback(null, { user: "fixture-user" });
+    },
+    onRcptTo(address, session, callback) {
+      if (address.address !== "leads@example.test")
+        return callback(new Error("Unexpected recipient"));
+      callback();
+    },
+    onData(stream, session, callback) {
+      let raw = "";
+      stream.on("data", (chunk) => {
+        raw += chunk.toString();
+      });
+      stream.on("end", () => {
+        if (rejectLead)
+          return callback(
+            Object.assign(new Error("Synthetic refusal"), {
+              responseCode: 451,
+            }),
+          );
+        assert.ok(session.secure);
+        const encoded = raw.match(
+          /Content-Type: application\/xml[^]*?Content-Transfer-Encoding: base64[^]*?\r\n\r\n([^]*?)\r\n--/i,
+        )?.[1];
+        assert.ok(
+          encoded,
+          "ADF uses the specification's application/xml MIME part",
+        );
+        received.push({
+          raw,
+          xml: Buffer.from(encoded.replace(/\s/g, ""), "base64").toString(
+            "utf8",
+          ),
+          envelope: session.envelope,
+        });
+        callback(null, "Queued synthetic fixture");
+      });
+    },
+  });
+  await new Promise((resolve) => smtp.listen(0, "127.0.0.1", resolve));
+  async function stopApp() {
+    if (app && app.exitCode === null) {
+      const exited = new Promise((resolve) => app.once("exit", resolve));
+      app.kill("SIGTERM");
+      await exited;
     }
   }
-  assert.ok(ready, "Compiled app starts");
+  async function startApp(overrides = {}) {
+    await stopApp();
+    const probe = createTcpServer();
+    await new Promise((resolve) => probe.listen(0, "127.0.0.1", resolve));
+    const port = probe.address().port;
+    await new Promise((resolve) => probe.close(resolve));
+    const origin = `http://localhost:${port}`;
+    app = spawn(process.execPath, ["server.cjs"], {
+      env: {
+        ...process.env,
+        PORT: String(port),
+        SITE_URL: origin,
+        SITE_INDEXABLE: "false",
+        NODE_EXTRA_CA_CERTS: cert,
+        INVENTORY_FEED_URL: `https://127.0.0.1:${fixture.address().port}/feed`,
+        INVENTORY_FEED_TOKEN: "local-test-only",
+        INVENTORY_FILE_PATH: "",
+        SMTP_HOST: "localhost",
+        SMTP_PORT: String(smtp.server.address().port),
+        SMTP_USER: "fixture-user",
+        SMTP_PASSWORD: "fixture-password",
+        SMTP_FROM: "website@example.test",
+        ADF_LEAD_TO: "leads@example.test",
+        ...overrides,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    app.stdout.on("data", (data) => {
+      logs += data;
+    });
+    app.stderr.on("data", (data) => {
+      logs += data;
+    });
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try {
+        await fetch(`${origin}/api/leads`);
+        return origin;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    throw new Error("Compiled app did not start");
+  }
+  let origin = await startApp();
   const inventory = await (await fetch(`${origin}/inventory`)).text();
-  assert.ok(inventory.includes("Photos coming soon"));
-  assert.ok(inventory.includes("fixture-active"));
-  assert.ok(!inventory.includes("fixture-sold"));
-  assert.ok(!inventory.includes("Inventory preview"));
+  assert.ok(
+    inventory.includes("Photos coming soon") &&
+      inventory.includes("fixture-active"),
+  );
+  assert.ok(
+    !inventory.includes("fixture-sold") &&
+      !inventory.includes("Inventory preview"),
+  );
   const detail = await (
     await fetch(`${origin}/inventory/fixture-car/fixture-active`)
   ).text();
   assert.ok(detail.includes("Photos are on the way."));
-  assert.ok(!detail.match(/<meta name="description"[^>]*0 miles/));
   const structured = [
     ...detail.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g),
   ]
     .map((match) => JSON.parse(match[1]))
     .find((data) => data["@type"] === "Car");
-  assert.ok(structured, "Authorized active feed emits vehicle structured data");
-  assert.ok(!structured.offers, "Unknown price is not a $0 offer");
   assert.ok(
-    !structured.mileageFromOdometer,
-    "Unknown mileage is not zero miles",
+    structured && !structured.offers && !structured.mileageFromOdometer,
   );
   const lead = {
-    firstName: "Local",
+    firstName: "Synthetic",
     lastName: "Fixture",
     email: "test@example.com",
     phone: "8015550123",
@@ -162,85 +197,91 @@ try {
     intent: "contact",
     consent: true,
   };
-  const submit = (data) =>
+  let submission = 0;
+  const submit = (data, headers = {}) =>
     fetch(`${origin}/api/leads`, {
       method: "POST",
-      headers: { Origin: origin, "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-  const accepted = await submit(lead);
-  assert.equal(accepted.status, 201);
-  assert.equal(received.length, 1);
-  assert.equal(received[0].body.email, lead.email);
-  assert.equal(received[0].body.id, received[0].idempotencyKey);
-  assert.equal(received[0].body.textConsent, false);
-  rejectLead = true;
-  const rejected = await submit(lead);
-  assert.equal(rejected.status, 502);
-  assert.match((await rejected.json()).message, /couldn’t confirm delivery/);
-  assert.equal((await submit({ ...lead, phone: "---" })).status, 400);
-  assert.equal((await submit({ ...lead, website: "bot" })).status, 400);
-  assert.equal(
-    received.length,
-    2,
-    "Invalid and honeypot leads were never forwarded",
-  );
-  const finance = JSON.parse(
-    await readFile("tests/fixtures/finance-application.json", "utf8"),
-  );
-  const postFinance = (data, headers = {}) =>
-    fetch(`${origin}/api/finance`, {
-      method: "POST",
       headers: {
-        Origin: origin,
         "Content-Type": "application/json",
-        "X-Forwarded-For": "192.0.2.15",
+        origin,
+        "X-Forwarded-For": `192.0.2.${++submission}`,
         ...headers,
       },
       body: JSON.stringify(data),
     });
-  const financeAccepted = await postFinance(finance);
-  assert.equal(financeAccepted.status, 201);
-  const receipt = await financeAccepted.json();
-  assert.equal(receivedFinance.length, 1);
-  assert.equal(receipt.reference, receivedFinance[0].idempotencyKey);
+  for (const intent of [
+    "contact",
+    "availability",
+    "test-drive",
+    "trade",
+    "consignment",
+    "text",
+  ]) {
+    const response = await submit({
+      ...lead,
+      intent,
+      email: intent === "text" ? "" : lead.email,
+      textConsent: intent === "text",
+      vehicleId: ["availability", "test-drive"].includes(intent)
+        ? vehicle.id
+        : undefined,
+      vehicleName: "Forged vehicle",
+      preferredDate: "2026-10-20",
+      preferredTime: "Afternoon",
+      trade: ["trade", "consignment"].includes(intent)
+        ? {
+            year: 2020,
+            make: "Fixture",
+            model: "Trade",
+            mileage: 12345,
+            condition: "Good",
+          }
+        : undefined,
+      to: "attacker@example.test",
+    });
+    assert.equal(response.status, 201, intent);
+    const receipt = await response.json();
+    const email = received.at(-1);
+    assert.ok(email.xml.includes(receipt.reference));
+    assert.equal(email.envelope.rcptTo.length, 1);
+    assert.equal(email.envelope.rcptTo[0].address, "leads@example.test");
+    assert.equal(email.envelope.mailFrom.address, "website@example.test");
+    assert.ok(
+      !email.raw.includes("attacker@example.test") &&
+        !email.xml.includes("Forged vehicle"),
+    );
+    if (intent === "availability") {
+      assert.ok(
+        email.xml.includes(`<vin>${vehicle.vin}</vin>`) &&
+          email.xml.includes(`<stock>${vehicle.stock}</stock>`),
+      );
+      assert.ok(
+        !email.xml.includes("<odometer"),
+        "Unknown inventory mileage stays unknown",
+      );
+    }
+  }
+  const delivered = received.length;
+  assert.equal((await submit({ ...lead, consent: false })).status, 400);
+  assert.equal((await submit({ ...lead, website: "bot" })).status, 400);
   assert.equal(
-    receivedFinance[0].body.application.applicant_ssn,
-    finance.applicant_ssn,
-  );
-  assert.ok(!JSON.stringify(receipt).includes(finance.applicant_ssn));
-  rejectFinance = true;
-  assert.equal(
-    (await postFinance(finance)).status,
-    502,
-    "A 200 response without accepted:true is not success",
-  );
-  rejectFinance = false;
-  assert.equal(
-    (await postFinance(finance, { Origin: "https://unrelated.example" }))
-      .status,
+    (await submit(lead, { origin: "https://attacker.example" })).status,
     403,
   );
-  const invalidFinance = await postFinance({
-    ...finance,
-    applicant_email: "not-an-email",
-  });
-  assert.equal(invalidFinance.status, 400);
-  const invalidBody = await invalidFinance.text();
-  assert.ok(!invalidBody.includes(finance.applicant_ssn));
-  assert.ok(!invalidBody.includes("not-an-email"));
-  assert.equal((await postFinance({ ...finance, website: "bot" })).status, 400);
   assert.equal(
-    (await postFinance({ ...finance, message: "x".repeat(33000) })).status,
+    (await submit({ ...lead, message: "x".repeat(17000) })).status,
     413,
   );
+  rejectLead = true;
+  assert.equal((await submit(lead)).status, 502);
+  assert.equal(received.length, delivered);
+  rejectLead = false;
   assert.equal(
-    receivedFinance.length,
-    2,
-    "Rejected, invalid, cross-origin and honeypot requests were not forwarded",
+    (await submit({ ...lead, vehicleId: "removed-vehicle" })).status,
+    201,
   );
+  assert.ok(received.at(-1).xml.includes("<year></year>"));
 
-  // A real browser completes the enabled joint flow against this isolated HTTPS relay.
   browser = await chromium.launch({
     headless: true,
     executablePath:
@@ -249,142 +290,109 @@ try {
         ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         : undefined),
   });
-  const noJsContext = await browser.newContext({
-    javaScriptEnabled: false,
-    reducedMotion: "reduce",
-  });
-  const noJsPage = await noJsContext.newPage();
-  await noJsPage.goto(`${origin}/financing/apply`);
-  await noJsPage.locator('[name="applicant_name_first"]').fill("Synthetic");
-  await noJsPage.locator('[name="applicant_ssn"]').fill(finance.applicant_ssn);
-  let fallbackRequest;
-  await noJsPage.route("**/*", async (route) => {
-    if (route.request().isNavigationRequest()) {
-      fallbackRequest = route.request();
-      await route.fulfill({
-        status: 415,
-        body: "JavaScript is required to apply.",
-      });
-    } else await route.continue();
-  });
-  await noJsPage
-    .getByRole("button", { name: "Continue", exact: true })
-    .click({ force: true });
-  assert.equal(
-    fallbackRequest?.method(),
-    "POST",
-    "Unhydrated forms must not place sensitive data in a URL",
+  const browserContext = await browser.newContext();
+  const page = await browserContext.newPage();
+  await page.route("https://staging.dealr.website/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><html lang='en'><title>Provider fixture</title><main><h1>Provider application fixture</h1></main></html>",
+    }),
   );
-  assert.equal(fallbackRequest?.url(), `${origin}/api/finance`);
-  assert.ok(!noJsPage.url().includes(finance.applicant_ssn));
-  await noJsContext.close();
-  const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    reducedMotion: "reduce",
-  });
-  await context.addInitScript(() => {
-    Element.prototype.requestPointerLock = () => Promise.resolve();
-    Element.prototype.setPointerCapture = () => {};
-  });
-  const page = await context.newPage();
-  await page.goto(`${origin}/financing/apply`);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const application = await page.goto(
+    `${origin}/financing/apply?entry_id=fixture-active`,
+  );
+  assert.equal(application.headers()["referrer-policy"], "no-referrer");
+  assert.ok(application.headers()["cache-control"].includes("no-store"));
   assert.equal(
     await page
-      .locator('[name="applicant_name_first"]')
-      .evaluate((el) => document.activeElement === el),
-    true,
+      .locator('iframe[title="Credit Application"]')
+      .getAttribute("src"),
+    "https://staging.dealr.website/39984",
   );
-  await page.getByLabel("Joint application", { exact: true }).check();
-  const co = Object.fromEntries(
-    Object.entries(finance)
-      .filter(([key]) => key.startsWith("applicant_"))
-      .map(([key, value]) => [
-        key.replace("applicant_", "coapplicant_"),
-        value,
-      ]),
+  assert.equal(await page.locator('input[name*="ssn"]').count(), 0);
+  assert.ok(
+    (await page.locator(".credit-application-note").innerText()).includes(
+      "Fixture vehicle",
+    ),
   );
-  const fillVisible = async () => {
-    for (const [name, value] of Object.entries({ ...finance, ...co })) {
-      const input = page.locator(`[name="${name}"]`);
-      if (
-        (await input.count()) === 1 &&
-        (await input.isVisible()) &&
-        (await input.isEnabled())
-      ) {
-        const tag = await input.evaluate((el) => el.tagName);
-        const type = await input.getAttribute("type");
-        if (tag === "SELECT") await input.selectOption(value);
-        else if (!["checkbox", "radio"].includes(type)) await input.fill(value);
-      }
-    }
-  };
-  for (let step = 0; step < 4; step++) {
-    await fillVisible();
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-      .analyze();
-    assert.deepEqual(
-      accessibility.violations.map(({ id }) => id),
-      [],
-      `Application step ${step + 1} accessibility`,
-    );
-    if (step === 1) {
-      await page.locator('[name="applicant_current_address_years"]').fill("1");
-      assert.equal(
-        await page.locator('[name="applicant_previous_address"]').isVisible(),
-        true,
-      );
-      await page.locator('[name="applicant_current_address_years"]').fill("3");
-      assert.equal(
-        await page.locator('[name="applicant_previous_address"]').count(),
-        0,
-      );
-    }
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-  }
-  await page
-    .getByRole("button", { name: "Submit application", exact: true })
-    .waitFor();
-  await page.locator('[name="acceptance_of_terms"]').check();
-  await page.locator('[name="coapplicant_acceptance"]').check();
-  const reviewAccessibility = await new AxeBuilder({ page })
+  assert.equal(
+    (
+      await fetch(`${origin}/api/finance`, {
+        method: "POST",
+        body: "discarded synthetic body",
+      })
+    ).status,
+    410,
+  );
+  const parsed = await page.evaluate(
+    (docs) =>
+      docs.map((xml) => {
+        const doc = new DOMParser().parseFromString(xml, "application/xml");
+        return {
+          errors: doc.querySelectorAll("parsererror").length,
+          prospects: doc.querySelectorAll("adf > prospect").length,
+          name: doc.querySelector('customer name[part="first"]')?.textContent,
+        };
+      }),
+    received.map((message) => message.xml),
+  );
+  for (const doc of parsed)
+    assert.deepEqual(doc, { errors: 0, prospects: 1, name: "Synthetic" });
+  const accessibility = await new AxeBuilder({ page })
+    .exclude("iframe")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
   assert.deepEqual(
-    reviewAccessibility.violations.map(({ id }) => id),
+    accessibility.violations.map((v) => v.id),
     [],
-    "Application review accessibility",
   );
-  await page
-    .getByRole("button", { name: "Submit application", exact: true })
-    .click();
-  await page.getByText("APPLICATION RECEIVED", { exact: true }).waitFor();
-  assert.equal(receivedFinance.length, 3);
-  assert.equal(receivedFinance[2].body.application.application_type, "joint");
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  }
+  await page.close();
+  origin = await startApp({ SMTP_PASSWORD: "" });
   assert.equal(
-    receivedFinance[2].body.application.coapplicant_ssn,
-    finance.applicant_ssn,
+    (await submit(lead)).status,
+    503,
+    "Missing SMTP credentials must not claim delivery",
   );
+  origin = await startApp({ SMTP_PASSWORD: "incorrect" });
   assert.equal(
-    await page.locator('input[type="password"]').count(),
-    0,
-    "Sensitive inputs clear after acceptance",
+    (await submit(lead)).status,
+    502,
+    "Failed SMTP authentication must not claim delivery",
   );
-  assert.deepEqual(
-    await page.evaluate(() => [localStorage.length, sessionStorage.length]),
-    [0, 0],
+  smtp.options.disabledCommands.push("AUTH");
+  smtp.options.authOptional = true;
+  origin = await startApp();
+  const beforeAuthless = received.length;
+  assert.equal(
+    (await submit(lead)).status,
+    502,
+    "A TLS relay without AUTH must not receive a lead",
   );
-  await context.close();
+  assert.equal(received.length, beforeAuthless);
+  assert.ok(
+    !logs.includes(lead.email) &&
+      !logs.includes(lead.message) &&
+      !logs.includes("fixture-password"),
+  );
   console.log(
-    "PASS: authenticated inventory feed, active filtering, missing facts/photos, lead acceptance/rejection, validation and honeypot forwarding guards; authenticated credit delivery, durable receipt, no sensitive error echo, two-year history and complete joint application in a browser.",
+    "PASS: inventory fixtures; all six inquiry types as authenticated TLS ADF email; recipient isolation, validation, rejected delivery, missing credentials, XML parsing and log redaction; provider iframe, retired native endpoint, responsive layout and accessibility.",
   );
 } finally {
   if (browser) await browser.close();
   if (app && app.exitCode === null) {
+    const exited = new Promise((resolve) => app.once("exit", resolve));
     app.kill("SIGTERM");
-    await new Promise((resolve) => app.once("exit", resolve));
+    await exited;
   }
+  if (smtp) await new Promise((resolve) => smtp.close(resolve));
   if (fixture) await new Promise((resolve) => fixture.close(resolve));
   await rm(dir, { recursive: true, force: true });
 }

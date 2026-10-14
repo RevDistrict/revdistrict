@@ -4,6 +4,7 @@ export const site = {
   phoneHref: "tel:+18019068111",
   smsHref: "sms:+18019068111",
   email: "utahusedcarfactory@gmail.com",
+  creditApplicationUrl: "https://staging.dealr.website/39984",
   address: "7036 S High Tech Dr",
   city: "Midvale, UT 84047",
   maps: "https://www.google.com/maps/search/?api=1&query=7036+S+High+Tech+Dr+Midvale+UT+84047",

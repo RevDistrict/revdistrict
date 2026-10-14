@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No environment variables are required for the labeled inventory preview. Forms will not claim delivery without an approved lead relay.
+Open http://localhost:3000. No environment variables are required for the labeled inventory preview. Forms will not claim delivery without an configured SMTP delivery.
 
 ## Production build
 
@@ -37,10 +37,10 @@ Upload `src/`, `public/`, `.next/`, `package.json`, `package-lock.json`, `next.c
 
 ## Launch sequence
 
-The October 14 provider conversation confirms dealership-owned hosting and SFTP delivery. Follow [the current inventory handoff](DEALR-INVENTORY.md); the preferred financing integration is now dealr.cloud's iframe, which has not arrived. Keep the native financial relay disabled unless separately approved. The dependency audit findings recorded in that handoff must also be resolved before deployment.
+The October 14 provider conversation confirms dealership-owned hosting and SFTP delivery. Follow [the current inventory handoff](DEALR-INVENTORY.md); the supplied dealr.cloud iframe and ADF email adapter are now integrated. Configure the host-owned SMTP account before enabling inquiry delivery. The dependency audit findings recorded in that handoff must also be resolved before deployment.
 
-1. Connect and validate the dealer-authorized inventory adapter and lead relay on a staging origin.
-2. Obtain and integrate the approved dealr.cloud credit iframe at `/financing/apply`, including allowed domains, vehicle association and provider-confirmed receipt testing. This is still pending; do not enable the existing native financial relay as a substitute without a separate provider decision. See `INTEGRATIONS.md` for the existing relay contract if that alternative is chosen.
+1. Connect and validate the dealer-authorized inventory adapter and authenticated SMTP sender on a staging origin.
+2. Verify the supplied dealr.cloud credit iframe at `/financing/apply` on the final domain and confirm a provider-authorized test receipt. Confirm ADF inbox/routing, sender-domain authentication and provider-enforced onward TLS. See `INTEGRATIONS.md` for configuration and remaining checks.
 3. Confirm the new domain, business email, logo treatment, phone/hours and legal copy with the dealer.
 4. Replace the two temporary video slots if the new films are ready. Review captions and posters.
 5. Configure HTTPS, environment variables, trusted proxy headers and shared abuse protection. Disable request-body capture in proxy, server and monitoring logs; verify no lead or financial payloads appear. Confirm encrypted storage and access controls at the provider/relay.

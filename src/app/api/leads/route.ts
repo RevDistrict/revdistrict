@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash, randomUUID } from "node:crypto";
 import { leadSchema, rateLimit } from "@/lib/leads";
+import { adfDeliveryConfig, deliverAdfLead } from "@/lib/adf-delivery";
+import { getInventory } from "@/lib/inventory";
+import type { Vehicle } from "@/lib/vehicle";
 export const runtime = "nodejs";
 const reply = (body: object, status: number) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -62,8 +65,8 @@ export async function POST(request: NextRequest) {
     );
   if (result.data.website)
     return reply({ message: "This submission could not be accepted." }, 400);
-  const webhook = process.env.LEAD_WEBHOOK_URL;
-  if (!webhook)
+  const delivery = adfDeliveryConfig();
+  if (!delivery)
     return reply(
       {
         message:
@@ -72,34 +75,18 @@ export async function POST(request: NextRequest) {
       },
       503,
     );
-  if (!webhook.startsWith("https://"))
-    return reply(
-      {
-        message: "Messaging is temporarily unavailable. Please call us.",
-        reference,
-      },
-      503,
-    );
   try {
-    const response = await fetch(webhook, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": reference,
-        ...(process.env.LEAD_WEBHOOK_TOKEN
-          ? { Authorization: `Bearer ${process.env.LEAD_WEBHOOK_TOKEN}` }
-          : {}),
-      },
-      body: JSON.stringify({
-        id: reference,
-        submittedAt: new Date().toISOString(),
-        source: "RevDistrict website",
-        ...result.data,
-      }),
-      signal: AbortSignal.timeout(10000),
-      redirect: "error",
-    });
-    if (!response.ok) throw new Error("Lead relay declined request");
+    let vehicle: Vehicle | undefined;
+    if (result.data.vehicleId) {
+      try {
+        vehicle = (await getInventory()).vehicles.find(
+          (v) => v.id === result.data.vehicleId,
+        );
+      } catch {
+        // Preserve the inquiry if inventory is unavailable, with only the requested ID.
+      }
+    }
+    await deliverAdfLead(delivery, result.data, reference, vehicle);
     return reply(
       {
         message:

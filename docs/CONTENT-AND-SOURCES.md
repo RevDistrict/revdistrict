@@ -13,7 +13,7 @@ Private screenshots and raw media remain in the ignored `research/source-media/`
 | `/`, `/home` | `/` | Layered cinematic hero, prominent inventory/financing/consignment routes, drive-style selection, owner video and visit |
 | `/inventory` | `/inventory` | Search, body/make/budget/style filters, sort, pagination, saved vehicles |
 | `/inventory/<slug>/<id>` | Same route pattern | Full-width gallery, keyboard lightbox, original facts/history, calculator, inquiry/test drive, related vehicles |
-| `/financing` | `/financing` and `/financing/apply` | Budget calculator, credit-range explanations, native individual/joint application with conditional history and dedicated delivery adapter |
+| `/financing` | `/financing` and `/financing/apply` | Budget calculator, credit-range explanations, provider-supplied dealr.cloud credit application iframe |
 | Application authorizations | `/financing/terms` | On-site credit authorization information; dealer/provider review required before enabling submission |
 | `/sell-your-vehicle` | Same | Vehicle and contact fields, valuation process and honest submission state |
 | `/contact-us` | Same | Contact form, existing public channels, hours and map |

@@ -1,15 +1,15 @@
 # dealr.cloud inventory handoff — October 14, 2026
 
-Josh asked for the CSV inventory integration to be built while the dealership arranges SFTP. The existing Next.js inventory browser and vehicle pages now read the importer's normalized snapshot. No live connection, hosting account, DNS change, lead delivery, or credit application has been enabled.
+Josh asked for the CSV inventory integration to be built while the dealership arranges SFTP. The existing Next.js inventory browser and vehicle pages now read the importer's normalized snapshot. No live SFTP connection, hosting account, DNS change or SMTP delivery has been configured. The supplied credit iframe and ADF email adapter are integrated; see `INTEGRATIONS.md`.
 
 ## What the conversation establishes
 
 - The dealership will host/deploy the website and provide the FTP/SFTP destination. dealr.cloud sends inventory files to that destination; it is not offering a server for us to pull from.
 - Adam at dealr.cloud confirmed standard CSV delivery, hourly by default. His `Generic-CSV-Sample.csv` contains **58 column names and one entirely empty row**, not a populated vehicle example. The exact supplied file is preserved as `tests/fixtures/dealr-schema.csv`.
-- Josh's latest email asks whether exports contain the entire inventory or only changes, and whether each export overwrites one filename. Those questions remain unanswered in the thread reviewed.
-- The credit application is a separate provider iframe. General contact/inquiry forms need the dealership's ADF lead forwarding details. Neither has been supplied yet. The native financial relay already in this repo is not the integration Adam proposed; keep it disabled while obtaining the iframe.
+- Adam’s latest reply confirms each export includes all currently Active vehicles and sends the same filename hourly. The server owner decides whether to archive old uploads or replace the stored file.
+- The supplied credit iframe is `https://staging.dealr.website/39984`. The supplied ADF inbox is `dealer-the-used-car-factory@leads.dealrcloud.com`, with an ADF 1.0 spec and example. Both are now implemented in the website.
 
-Sources: [Josh's Slack request](https://agentboostmarketing.slack.com/archives/C0C9UNS3A1W/p1792005605437029), [Adam's clarification](https://mail.google.com/mail/u/0/#all/1a13b895bb58bccb), [Josh's latest email](https://mail.google.com/mail/u/0/#all/1a13bd83de987bc4).
+Sources: [Josh's Slack request](https://agentboostmarketing.slack.com/archives/C0C9UNS3A1W/p1792005605437029), [Adam's clarification](https://mail.google.com/mail/u/0/#all/1a13b895bb58bccb), [Adam's latest confirmation](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d).
 
 ## Review locally
 
@@ -28,12 +28,12 @@ Open http://localhost:3000/inventory, then the Acura demo listing. Verify the pr
 
 The host must support the project's Node.js version, persistent private storage, a scheduled job, and outbound SFTP (unless CSVs arrive on the same filesystem). The job uses `tsx`; retain this dependency on the worker (`npm ci`, not `npm ci --omit=dev`). Credentials belong in host-managed environment variables, never source or messages. The CLI reads the process environment; it does not automatically load `.env.local`.
 
-1. Get a populated export and confirm **complete current active inventory** and how sold/deleted vehicles disappear. Only then set `DEALR_FEED_MODE=full`. Delta feeds are deliberately rejected; they need a documented deletion/status contract before adding merge behavior.
+1. Set `DEALR_FEED_MODE=full`, matching Adam’s confirmed complete active-inventory exports and `.env.example`. Get a populated export and verify that a sold/deactivated vehicle disappears from the next snapshot. Delta feeds remain deliberately unsupported.
 2. Set `SITE_URL` to the final HTTPS origin, `DEALR_DEALER_ID` to the expected CSV DealerID, and `INVENTORY_FILE_PATH` to an absolute private snapshot path outside `public/` and the deployed web root. Create the parent directory first and allow only the import worker/web process to access it. Use encrypted storage offered by the host. Configure either this path or `INVENTORY_FEED_URL`, not both.
 3. Set `DEALR_SFTP_HOST`, `DEALR_SFTP_PORT`, `DEALR_SFTP_USERNAME` and the exact completed CSV `DEALR_SFTP_PATH`. Authenticate with `DEALR_SFTP_PASSWORD` or `DEALR_SFTP_PRIVATE_KEY_PATH` (optional `DEALR_SFTP_PASSPHRASE`). Give our reader read-only access to this feed; dealr.cloud needs its separate delivery access.
 4. Obtain the server's SHA256 **hex** host-key fingerprint independently from the server owner and set `DEALR_SFTP_HOST_SHA256`. Unknown/mismatched host keys are rejected. Do not blindly trust the first connection.
 5. Run `npm run inventory:import`, then schedule the same command after each hourly upload. If the CSV arrives on the website host, use `npm run inventory:import -- --input /private/feed/inventory.csv` instead. The scheduler must load the same environment and report nonzero exits.
-6. Ask the sender to upload to a temporary name and rename after completion. The importer checks size and modification time before/after reads, but that cannot prove a paused partial upload is complete. A new filename every hour needs an agreed way of identifying the latest **completed** export; no guessed wildcard/newest-file selection is implemented.
+6. Ask the sender to upload to a temporary name and rename after completion. The importer checks size and modification time before/after reads, but that cannot prove a paused partial upload is complete. Adam confirmed a fixed filename; use its exact destination path. Archive earlier uploads separately if the host needs history.
 
 The importer validates the whole file before atomically replacing the snapshot. Concurrent jobs are excluded by an adjacent `.lock` file. Failed imports retain the previous snapshot and return a nonzero exit. After a machine/process crash, remove a leftover lock only after verifying no import is running. Regular errors release it automatically.
 
@@ -47,14 +47,14 @@ The snapshot's `capturedAt` uses the source file's modification time, not the im
 - Body categories come from `BodyType`/`BodyStyle`, never model-name guesses. Unknown values remain Other. Blank price/mileage stay unknown in the existing UI. Blank photos use the existing placeholder.
 - Dealer comments become plain text. CARFAX is omitted because the sample has no confirmed CARFAX column. Extra fields are not interpreted without a specification.
 - Missing/duplicate IDs, duplicate VINs, wrong DealerID, malformed numbers/CSV, non-HTTPS photos and oversized files reject the whole import. Limits are 10 MB and 1,000 vehicles. Empty/schema-only files are rejected to avoid wiping stock; a genuine zero-stock export needs an agreed explicit empty-inventory policy.
-- A confirmed full export replaces the inventory. Missing vehicles disappear and their detail pages show the noindex not-found state. Next.js returns 404 before streaming, or 200 with the not-found state once streaming has begun. There is no sold/status field in the supplied header, so this behavior depends on the provider confirming active-only full snapshots.
+- A confirmed full export replaces the inventory. Missing vehicles disappear and their detail pages show the noindex not-found state. Next.js returns 404 before streaming, or 200 with the not-found state once streaming has begun. There is no sold/status field in the supplied header, and Adam confirmed that the file contains only Active vehicles.
 
 ## What the team still needs
 
 **Dealership / Omar:** hosting plan, server owner, SFTP destination, secure access for dealr.cloud delivery and our reader, and final production domain.
 
-**dealr.cloud / Josh:** populated CSV, exact filename/directory, full-versus-delta and sold handling, completed-upload convention, photo/option separators, promotional-price precedence, old/new ID correspondence, credit iframe code and allowed domains, and ADF address/format plus a safe test destination.
+**dealr.cloud / Josh:** populated CSV, exact filename/directory, a sold-vehicle test, completed-upload convention, photo/option separators, promotional-price precedence, old/new ID correspondence, credit iframe allowed domains/prefill support, SMTP sender configuration and a safe ADF test destination with confirmed CRM routing.
 
 Before launch, verify new listing, price change, photo reorder, removal of a sold listing, rejected/partial file, stale-feed failure and recovery against the provider's real test export. Local fixtures do not establish a live provider connection.
 
-The October 14 dependency audit also reported eight high-severity package findings in existing Next.js, Sharp, source-map-js and the ESLint/braces chain. The new CSV/SFTP packages had no audit findings. These existing findings require a separate security update/review before deployment; no security exception or production approval has been granted.
+The available dependency security patches are applied. The production dependency audit is clean, but the full audit still flags the development-only ESLint/braces chain (one unpatched advisory across five packages). CI retains that failure and no security exception has been granted. See `VERIFICATION.md`.

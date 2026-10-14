@@ -75,268 +75,48 @@
   max-width: 385px;
   padding-bottom: 6px;
 }
-.application-layout {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 8%;
+/* The provider owns the form; the surrounding page retains the site's typography. */
+.credit-application {
   max-width: 1260px;
   margin: auto;
-  align-items: start;
 }
-.application-progress {
-  position: sticky;
-  top: 115px;
-}
-.application-progress ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.application-progress li {
-  border-bottom: 1px solid var(--line);
-}
-.application-progress li button {
-  display: flex;
-  gap: 17px;
-  text-align: left;
-  align-items: center;
-  width: 100%;
-  padding: 20px 0;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: uppercase;
-}
-.application-progress li button > span {
+.credit-application-note {
   display: grid;
-  place-items: center;
-  width: 22px;
-  font-size: 10px;
-}
-.application-progress li[aria-current="step"] button {
-  color: var(--accent);
-  font-weight: 700;
-}
-.application-progress li[aria-current="step"] {
-  border-bottom-color: var(--accent);
-}
-.application-progress li button:disabled {
-  opacity: 0.65;
-}
-.application-assistance {
-  margin-top: 35px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.application-assistance svg {
-  color: var(--accent);
-  margin-bottom: 12px;
-}
-.application-assistance a {
-  display: inline-block;
-  color: var(--ink);
-  margin-top: 10px;
-  font-size: 18px;
-}
-.application-form {
-  scroll-margin-top: 115px;
-  min-width: 0;
-}
-.application-notice {
-  border-left: 2px solid var(--accent);
-  padding: 20px 24px;
-  background: var(--surface);
-  margin-bottom: 35px;
-  font-size: 13px;
-}
-.application-notice strong {
-  font-weight: 650;
-}
-.application-notice p {
-  color: var(--muted);
-  margin-top: 8px;
-  line-height: 1.75;
-}
-.application-notice a {
-  text-decoration: underline;
-  color: var(--ink);
-}
-.application-step-heading {
-  margin-bottom: 30px;
-}
-.application-step-heading .mono {
-  color: var(--accent);
-  font-size: 10px;
-}
-.application-step-heading h2 {
-  font-size: clamp(30px, 3.1vw, 45px);
-  margin: 14px 0;
-}
-.application-step-heading > p {
-  color: var(--muted);
-  font-size: 12px;
-}
-.application-choice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 30px !important;
-}
-.application-choice legend {
-  font-size: 13px;
-  padding-bottom: 12px;
-}
-.application-choice label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 15px 20px;
-  border: 1px solid var(--line-light);
-  cursor: pointer;
-  color: var(--ink);
-}
-.application-choice label:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--surface);
-}
-.application-choice input[type="radio"] {
-  width: 17px;
-  min-height: 17px;
-  accent-color: var(--accent);
-}
-.application-form .field-wide {
-  grid-column: 1/-1;
-}
-.application-form input:disabled,
-.application-form select:disabled,
-.application-form textarea:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.application-form [aria-invalid="true"] {
-  border-color: #f4a994;
-}
-.application-form .field-error {
-  display: block;
-  color: #f4b59d;
-  font-size: 12px;
-  margin-top: 5px;
-}
-.application-help {
-  color: var(--muted);
-  font-size: 13px;
+  gap: 14px;
   margin-bottom: 24px;
-  line-height: 1.75;
-}
-.application-subsection {
-  border-top: 1px solid var(--line);
-  padding-top: 30px;
-  margin-top: 30px;
-}
-.application-subsection h3,
-.application-review h3,
-.application-authorization h3 {
-  font-size: 23px;
-  margin-bottom: 18px;
-}
-.application-subsection > p {
+  max-width: 760px;
   color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 25px;
+  font-size: 14px;
+  line-height: 1.8;
 }
-.application-review {
-  margin-top: 30px;
-  padding: 25px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+.credit-application-note strong {
+  color: var(--ink);
 }
-.application-review dl {
-  margin: 0;
-  font-size: 13px;
-}
-.application-review dl > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-.application-review dt {
-  color: var(--muted);
-}
-.application-review dd {
-  margin: 0;
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.application-review p {
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 18px;
-}
-.application-authorization {
-  margin-top: 35px;
-}
-.application-authorization > p {
-  font-size: 13px;
-  line-height: 1.85;
-  color: var(--muted);
-}
-.application-authorization > p a {
-  color: var(--accent);
+.credit-application-note a,
+.credit-application-help a {
+  color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-.application-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-  border-top: 1px solid var(--line);
-  padding-top: 28px;
-  margin-top: 32px;
+.credit-application-note a {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  width: fit-content;
 }
-.application-actions .button {
-  gap: 18px;
-}
-.application-actions > .button--outline {
-  margin-right: auto;
-}
-.application-footnote {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.75;
-  margin-top: 22px;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.application-footnote svg {
-  color: var(--accent);
-  margin-top: 3px;
-}
-.application-success {
-  padding: 50px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  max-width: 740px;
-  margin: 40px auto;
-}
-.application-success > svg {
-  color: var(--accent);
-  margin-bottom: 24px;
-}
-.application-success h2 {
-  font-size: 42px;
-}
-.application-success > p:not(.eyebrow) {
-  color: var(--muted);
-  margin: 24px 0;
-}
-.application-success > .mono {
+.credit-application-frame {
   display: block;
-  font-size: 10px;
-  margin-bottom: 28px;
-  overflow-wrap: anywhere;
+  width: 100%;
+  height: 1050px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.credit-application-help {
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
 }
 .text-request-page {
   max-width: 1050px;
@@ -358,15 +138,6 @@
 @media (min-width: 701px) {
   .consignment-hero h1 {
     font-size: clamp(50px, 5.25vw, 84px);
-  }
-}
-@media (max-width: 1100px) {
-  .application-layout {
-    grid-template-columns: 210px minmax(0, 1fr);
-    gap: 5%;
-  }
-  .application-form .form-grid {
-    gap: 22px 16px;
   }
 }
 @media (max-width: 700px) {
@@ -395,64 +166,7 @@
   .application-intro h1 {
     font-size: clamp(37px, 10vw, 60px);
   }
-  .application-layout {
-    grid-template-columns: 1fr;
-    gap: 26px;
-  }
-  .application-progress {
-    position: static;
-  }
-  .application-progress > .eyebrow,
-  .application-assistance {
-    display: none;
-  }
-  .application-progress ol {
-    display: flex;
-    overflow-x: auto;
-    gap: 18px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent) var(--surface);
-  }
-  .application-progress li {
-    flex-shrink: 0;
-  }
-  .application-progress li button {
-    font-size: 10px;
-    gap: 7px;
-    padding: 15px 0;
-  }
-  .application-notice {
-    padding: 18px;
-  }
-  .application-form .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .application-form input,
-  .application-form select {
-    font-size: 16px;
-  }
-  .application-choice {
-    gap: 10px;
-  }
-  .application-choice label {
-    padding: 12px 15px;
-    font-size: 13px;
-  }
-  .application-actions {
-    gap: 10px;
-  }
-  .application-actions .button {
-    padding: 14px;
-    font-size: 10px;
-    gap: 10px;
-  }
-  .application-review {
-    padding: 18px;
-  }
-  .application-success {
-    padding: 28px;
-  }
-  .application-success h2 {
-    font-size: 34px;
+  .credit-application-frame {
+    height: 850px;
   }
 }

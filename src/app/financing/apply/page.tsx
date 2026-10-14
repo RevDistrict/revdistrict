@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { FinanceApplication } from "@/components/finance-application";
-import { financeApplicationConfig } from "@/lib/finance-config";
 import { getInventory } from "@/lib/inventory";
+import { site } from "@/lib/site";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Credit Application",
@@ -15,18 +14,16 @@ export default async function ApplyPage({
   searchParams: Promise<{ entry_id?: string }>;
 }) {
   const query = await searchParams;
-  let vehicles: { id: string; name: string }[] = [];
-  try {
-    vehicles = (await getInventory()).vehicles.map(({ id, name }) => ({
-      id,
-      name,
-    }));
-  } catch {
-    /* An inventory outage must not prevent an application. */
+  let selected: { name: string } | undefined;
+  if (query.entry_id) {
+    try {
+      selected = (await getInventory()).vehicles.find(
+        (v) => v.id === query.entry_id,
+      );
+    } catch {
+      /* An inventory outage must not prevent an application. */
+    }
   }
-  const selected = vehicles.some((v) => v.id === query.entry_id)
-    ? query.entry_id
-    : "";
   return (
     <section className="section application-page">
       <Link className="application-back mono" href="/financing">
@@ -46,11 +43,37 @@ export default async function ApplyPage({
           for your situation, from established credit to buy here, pay here.
         </p>
       </div>
-      <FinanceApplication
-        enabled={financeApplicationConfig().enabled}
-        vehicles={vehicles}
-        selectedVehicle={selected}
-      />
+      <div className="credit-application">
+        <div className="credit-application-note">
+          <p>
+            Apply directly with The Used Car Factory through dealr.cloud. Review
+            the terms and authorizations in the application before submitting.
+          </p>
+          {selected && (
+            <p>
+              Interested in the <strong>{selected.name}</strong>? Choose that
+              vehicle in the application below.
+            </p>
+          )}
+          <a
+            href={site.creditApplicationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open application in a new tab <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+        <iframe
+          className="credit-application-frame"
+          src={site.creditApplicationUrl}
+          title="Credit Application"
+          referrerPolicy="no-referrer"
+        />
+        <p className="credit-application-help">
+          Need help applying? Call <a href={site.phoneHref}>{site.phone}</a>. If
+          the form doesn’t load here, use the link above to open it directly.
+        </p>
+      </div>
     </section>
   );
 }
