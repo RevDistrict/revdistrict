@@ -333,6 +333,8 @@ try {
   );
   for (const doc of parsed)
     assert.deepEqual(doc, { errors: 0, prospects: 1, name: "Synthetic" });
+  // The pulsing loading state animates opacity, so axe reads a transient low-contrast color from it.
+  await page.locator(".loading-page").waitFor({ state: "detached" });
   const accessibility = await new AxeBuilder({ page })
     .exclude("iframe")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
