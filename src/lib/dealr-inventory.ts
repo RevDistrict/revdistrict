@@ -7,7 +7,7 @@ import {
 } from "./vehicle";
 
 export const MAX_INVENTORY_BYTES = 10_000_000;
-export const MAX_INVENTORY_AGE_MS = 36 * 60 * 60 * 1000;
+export const MAX_INVENTORY_AGE_MS = 72 * 60 * 60 * 1000;
 
 type ImportOptions = {
   capturedAt: string;
@@ -172,7 +172,8 @@ export function parseDealrInventory(csv: string, options: ImportOptions) {
         );
     }
     const equipment = get("OptionDescription")
-      .split(/[|\r\n]+/)
+      // The live export joins "Label: value" options with commas; split only where a new label starts.
+      .split(/[|\r\n]+|,\s*(?=[A-Z][^,:]{0,80}: )/)
       .map((item) => item.trim())
       .filter(Boolean);
     // The empty vendor sample does not establish promotional-price precedence.

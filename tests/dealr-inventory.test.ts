@@ -1,18 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import {
   parseDealrInventory,
   assertInventoryFresh,
 } from "../src/lib/dealr-inventory";
-import {
-  readInventorySnapshot,
-  writeInventorySnapshot,
-} from "../src/lib/inventory-file";
 import { vehicleHref } from "../src/lib/vehicle";
 
 const fixture = readFileSync("tests/fixtures/dealr-inventory.csv", "utf8");
@@ -146,64 +140,26 @@ test("stale and future live exports are rejected; preview records stay explicitl
   assert.ok(data.vehicles.every((v) => v.status === "preview"));
 });
 
-test("the CLI preserves the last good snapshot on failure and requires explicit full-feed confirmation", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "dealr-import-"));
-  const output = join(dir, "inventory.json");
-  const env = {
-    ...process.env,
-    SITE_URL: options.siteUrl,
-    DEALR_DEALER_ID: options.dealerId,
-    DEALR_FEED_MODE: "",
-    INVENTORY_FILE_PATH: output,
-  };
-  const args = [
-    "--import",
-    "tsx",
-    "scripts/import-inventory.ts",
-    "--input",
-    "tests/fixtures/dealr-inventory.csv",
-  ];
-  try {
-    execFileSync(process.execPath, [...args, "--preview"], { env });
-    assert.equal((await readInventorySnapshot(output)).vehicles.length, 2);
-    const before = await readFile(output, "utf8");
-    const unconfirmed = spawnSync(process.execPath, args, {
-      env,
+test("the CLI requires explicit full-feed confirmation", () => {
+  const unconfirmed = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "scripts/import-inventory.ts",
+      "--input",
+      "tests/fixtures/dealr-inventory.csv",
+    ],
+    {
+      env: {
+        ...process.env,
+        SITE_URL: options.siteUrl,
+        DEALR_DEALER_ID: options.dealerId,
+        DEALR_FEED_MODE: "",
+      },
       encoding: "utf8",
-    });
-    assert.equal(unconfirmed.status, 1);
-    assert.match(unconfirmed.stderr, /Confirm complete active-inventory/);
-    const empty = spawnSync(
-      process.execPath,
-      [
-        "--import",
-        "tsx",
-        "scripts/import-inventory.ts",
-        "--input",
-        "tests/fixtures/dealr-schema.csv",
-        "--preview",
-      ],
-      { env, encoding: "utf8" },
-    );
-    assert.equal(empty.status, 1);
-    assert.equal(await readFile(output, "utf8"), before);
-    const valid = parseDealrInventory(fixture, options);
-    await writeInventorySnapshot(output, valid);
-    assert.equal((await readInventorySnapshot(output)).isPreview, false);
-    await writeInventorySnapshot(output, {
-      ...valid,
-      vehicles: [valid.vehicles[1]],
-    });
-    assert.deepEqual(
-      (await readInventorySnapshot(output)).vehicles.map((v) => v.id),
-      ["DEMO002"],
-    );
-    await assert.rejects(writeInventorySnapshot(output, { vehicles: [] }));
-    assert.deepEqual(
-      (await readInventorySnapshot(output)).vehicles.map((v) => v.id),
-      ["DEMO002"],
-    );
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+    },
+  );
+  assert.equal(unconfirmed.status, 1);
+  assert.match(unconfirmed.stderr, /Confirm complete active-inventory/);
 });

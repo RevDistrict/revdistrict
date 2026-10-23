@@ -1,6 +1,6 @@
 # dealr.cloud inventory handoff — October 14, 2026
 
-Josh asked for the CSV inventory integration to be built while the dealership arranges SFTP. The existing Next.js inventory browser and vehicle pages now read the importer's normalized snapshot. No live SFTP connection, hosting account, DNS change or SMTP delivery has been configured. The supplied credit iframe and ADF email adapter are integrated; see `INTEGRATIONS.md`.
+Josh asked for the CSV inventory integration to be built while the dealership arranges SFTP. **Update:** dealr.cloud delivers through AWS Transfer Family into an S3 bucket the dealership owns. The importer now reads that bucket with the AWS SDK and upserts vehicles into Postgres (Neon in production); the inventory browser and vehicle pages read from the database. Vehicles missing from the latest CSV are deleted. The older SFTP and snapshot-file text below is superseded by the production steps in this section. No live connection, hosting account, DNS change or SMTP delivery has been configured. The supplied credit iframe and ADF email adapter are integrated; see `INTEGRATIONS.md`.
 
 ## What the conversation establishes
 
@@ -16,28 +16,24 @@ Sources: [Josh's Slack request](https://agentboostmarketing.slack.com/archives/C
 The populated fixture contains two fictional vehicles with existing public dealer photo URLs. It is test data, not the dealership's current stock.
 
 ```sh
+npm run db:migrate   # needs DATABASE_URL, e.g. postgres://localhost/revdistrict
 SITE_URL=https://dealer.example DEALR_DEALER_ID=demo-dealer \
-  npm run inventory:import -- --input tests/fixtures/dealr-inventory.csv \
-  --output /tmp/revdistrict-inventory-demo.json --preview
-INVENTORY_FILE_PATH=/tmp/revdistrict-inventory-demo.json npm run dev
+  npm run inventory:import -- --input tests/fixtures/dealr-inventory.csv --preview
+npm run dev
 ```
 
 Open http://localhost:3000/inventory, then the Acura demo listing. Verify the preview notice, photos, price, mileage and specifications. The Toyota example exercises missing photos and unknown price/mileage. The importer persists the preview flag in JSON, so preview records do not become active stock when the website reads them. Keep `SITE_INDEXABLE=false` for review.
 
 ## Production connection
 
-The host must support the project's Node.js version, persistent private storage, a scheduled job, and outbound SFTP (unless CSVs arrive on the same filesystem). The job uses `tsx`; retain this dependency on the worker (`npm ci`, not `npm ci --omit=dev`). Credentials belong in host-managed environment variables, never source or messages. The CLI reads the process environment; it does not automatically load `.env.local`.
+The host must support the project's Node.js version, a scheduled job, and outbound HTTPS to S3 and Postgres. The job uses `tsx`; retain this dependency on the worker (`npm ci`, not `npm ci --omit=dev`). Credentials belong in host-managed environment variables, never source or messages. The CLI reads the process environment; it does not automatically load `.env.local`.
 
-1. Set `DEALR_FEED_MODE=full`, matching Adam’s confirmed complete active-inventory exports and `.env.example`. Get a populated export and verify that a sold/deactivated vehicle disappears from the next snapshot. Delta feeds remain deliberately unsupported.
-2. Set `SITE_URL` to the final HTTPS origin, `DEALR_DEALER_ID` to the expected CSV DealerID, and `INVENTORY_FILE_PATH` to an absolute private snapshot path outside `public/` and the deployed web root. Create the parent directory first and allow only the import worker/web process to access it. Use encrypted storage offered by the host. Configure either this path or `INVENTORY_FEED_URL`, not both.
-3. Set `DEALR_SFTP_HOST`, `DEALR_SFTP_PORT`, `DEALR_SFTP_USERNAME` and the exact completed CSV `DEALR_SFTP_PATH`. Authenticate with `DEALR_SFTP_PASSWORD` or `DEALR_SFTP_PRIVATE_KEY_PATH` (optional `DEALR_SFTP_PASSPHRASE`). Give our reader read-only access to this feed; dealr.cloud needs its separate delivery access.
-4. Obtain the server's SHA256 **hex** host-key fingerprint independently from the server owner and set `DEALR_SFTP_HOST_SHA256`. Unknown/mismatched host keys are rejected. Do not blindly trust the first connection.
-5. Run `npm run inventory:import`, then schedule the same command after each hourly upload. If the CSV arrives on the website host, use `npm run inventory:import -- --input /private/feed/inventory.csv` instead. The scheduler must load the same environment and report nonzero exits.
-6. Ask the sender to upload to a temporary name and rename after completion. The importer checks size and modification time before/after reads, but that cannot prove a paused partial upload is complete. Adam confirmed a fixed filename; use its exact destination path. Archive earlier uploads separately if the host needs history.
+1. Set `DEALR_FEED_MODE=full` (complete active-inventory exports; delta feeds are unsupported), `SITE_URL` (final HTTPS origin) and `DEALR_DEALER_ID` (expected CSV DealerID).
+2. Set `DATABASE_URL` and run `npm run db:migrate` once (idempotent).
+3. Set `S3_BUCKET_NAME`, `S3_INVENTORY_KEY` (find the key with `node --env-file=.env.local --import tsx scripts/list-s3-inventory.ts`), `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The IAM user needs only `s3:GetObject` and `s3:ListBucket` on the bucket.
+4. Schedule `npm run inventory:import` hourly after each upload; the scheduler must load the same environment and report nonzero exits.
 
-The importer validates the whole file before atomically replacing the snapshot. Concurrent jobs are excluded by an adjacent `.lock` file. Failed imports retain the previous snapshot and return a nonzero exit. After a machine/process crash, remove a leftover lock only after verifying no import is running. Regular errors release it automatically.
-
-The snapshot's `capturedAt` uses the source file's modification time, not the import time or a vehicle's `LastModifiedDate`. Repeatedly reading an old file therefore does not make it fresh. Confirm the sender updates file modification time on each complete export. Data older than 36 hours (or over five minutes in the future) fails; the existing page error state appears once the last good live snapshot ages out. The website reads the private snapshot at request time, so successful imports require no rebuild/restart. Each website replica must read the same snapshot or receive an atomic copy.
+The importer validates the whole file, then upserts and deletes in one transaction under an advisory lock. Failed imports leave the previous inventory in place and exit nonzero. `capturedAt` is the S3 object's `LastModified`; data older than 72 hours (or over five minutes in the future) is rejected, and the site shows its error state once the last good import ages out. The website reads the database per request, so imports need no rebuild or restart.
 
 ## Mapping and remaining assumptions
 

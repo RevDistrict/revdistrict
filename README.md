@@ -14,7 +14,7 @@ The homepage now prioritizes inventory, financing and consignment. On-site route
 The build contains a clearly labeled 262-vehicle preview captured September 23, 2026. Live dealr.cloud inventory and CRM delivery need dealer-authorized configuration. Unconfigured lead forms fail honestly and offer the existing phone/email. Credit applications go directly to the provider through its supplied iframe. Inquiry delivery uses ADF email and needs host-managed SMTP credentials; see `.env.example`. No lead is silently stored or falsely acknowledged. See the integration handoff before enabling production applications.
 
 - [Integration contract and provider handoff](docs/INTEGRATIONS.md)
-- [dealr.cloud CSV/SFTP importer and October 14 handoff](docs/DEALR-INVENTORY.md)
+- [dealr.cloud CSV/S3 importer and October 14 handoff](docs/DEALR-INVENTORY.md)
 - [Namecheap deployment](docs/DEPLOYMENT.md)
 - [Content, page parity and asset provenance](docs/CONTENT-AND-SOURCES.md)
 - [Validation evidence and review notes](docs/VERIFICATION.md)

@@ -34,7 +34,7 @@ export const vehicleSchema = z.object({
   equipment: z.record(z.string(), z.array(z.string().max(1000)).max(500)),
   carfaxUrl: httpsUrl.nullable(),
   sourceUrl: httpsUrl,
-  status: z.enum(["active", "sold", "inactive", "preview"]),
+  status: z.enum(["active", "preview"]),
 });
 export const inventorySchema = z.object({
   capturedAt: z.iso.datetime(),

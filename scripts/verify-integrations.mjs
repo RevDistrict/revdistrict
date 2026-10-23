@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { SMTPServer } from "smtp-server";
-import { createServer } from "node:https";
+import pg from "pg";
 import { createServer as createTcpServer } from "node:net";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +11,7 @@ import { execFileSync, spawn } from "node:child_process";
 
 // All submitted data and SMTP/HTTPS destinations are isolated local fixtures.
 const dir = await mkdtemp(join(tmpdir(), "revdistrict-integration-"));
-let app, fixture, smtp, browser;
+let app, db, smtp, browser;
 let logs = "";
 const received = [];
 let rejectLead = false;
@@ -54,18 +54,18 @@ try {
     mileage: 0,
     status: "active",
   };
-  fixture = createServer(tls, (req, res) => {
-    assert.equal(req.headers.authorization, "Bearer local-test-only");
-    res.setHeader("Content-Type", "application/json");
-    res.end(
-      JSON.stringify({
-        capturedAt: new Date().toISOString(),
-        source: "Local test fixture",
-        vehicles: [vehicle, { ...vehicle, id: "fixture-sold", status: "sold" }],
-      }),
-    );
-  });
-  await new Promise((resolve) => fixture.listen(0, "127.0.0.1", resolve));
+  assert.ok(process.env.TEST_DATABASE_URL, "Set TEST_DATABASE_URL.");
+  db = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL });
+  await db.connect();
+  await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");
+  await db.query(await readFile("db/schema.sql", "utf8"));
+  await db.query(
+    "INSERT INTO vehicles (id, status, data) VALUES ($1, $2, $3)",
+    [vehicle.id, vehicle.status, vehicle],
+  );
+  await db.query(
+    "INSERT INTO inventory_meta (singleton, captured_at, is_preview) VALUES (true, now(), false)",
+  );
   smtp = new SMTPServer({
     ...tls,
     secure: false,
@@ -137,9 +137,7 @@ try {
         SITE_URL: origin,
         SITE_INDEXABLE: "false",
         NODE_EXTRA_CA_CERTS: cert,
-        INVENTORY_FEED_URL: `https://127.0.0.1:${fixture.address().port}/feed`,
-        INVENTORY_FEED_TOKEN: "local-test-only",
-        INVENTORY_FILE_PATH: "",
+        DATABASE_URL: process.env.TEST_DATABASE_URL,
         SMTP_HOST: "localhost",
         SMTP_PORT: String(smtp.server.address().port),
         SMTP_USER: "fixture-user",
@@ -172,10 +170,7 @@ try {
     inventory.includes("Photos coming soon") &&
       inventory.includes("fixture-active"),
   );
-  assert.ok(
-    !inventory.includes("fixture-sold") &&
-      !inventory.includes("Inventory preview"),
-  );
+  assert.ok(!inventory.includes("Inventory preview"));
   const detail = await (
     await fetch(`${origin}/inventory/fixture-car/fixture-active`)
   ).text();
@@ -393,6 +388,6 @@ try {
     await exited;
   }
   if (smtp) await new Promise((resolve) => smtp.close(resolve));
-  if (fixture) await new Promise((resolve) => fixture.close(resolve));
+  await db?.end();
   await rm(dir, { recursive: true, force: true });
 }

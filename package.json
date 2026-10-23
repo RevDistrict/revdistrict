@@ -14,9 +14,11 @@
     "test:e2e": "playwright test",
     "test:integrations": "node scripts/verify-integrations.mjs",
     "inventory:import": "node --import tsx scripts/import-inventory.ts",
-    "test:inventory": "node scripts/verify-dealr-inventory.mjs"
+    "test:inventory": "node scripts/verify-dealr-inventory.mjs",
+    "db:migrate": "node --import tsx scripts/migrate.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1156.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.23",
@@ -25,10 +27,10 @@
     "lucide-react": "^1.47.0",
     "next": "^16.3.8",
     "nodemailer": "^10.1.1",
+    "pg": "^8.23.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
-    "ssh2-sftp-client": "^12.1.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -36,14 +38,13 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.2",
     "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/ssh2-sftp-client": "^9.0.6",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.8",
     "prettier": "^3.9.9",
     "smtp-server": "^3.19.22",
-    "ssh2": "^1.17.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3"
   }
