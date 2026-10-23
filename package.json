@@ -15,7 +15,8 @@
     "test:integrations": "node scripts/verify-integrations.mjs",
     "inventory:import": "node --import tsx scripts/import-inventory.ts",
     "test:inventory": "node scripts/verify-dealr-inventory.mjs",
-    "db:migrate": "node --import tsx scripts/migrate.ts"
+    "db:migrate": "node --import tsx scripts/migrate.ts",
+    "test:e2e:seed": "node scripts/seed-test-inventory.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

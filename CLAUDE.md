@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev` — dev server on http://localhost:3000
 - `npm run typecheck` (runs `next typegen` first), `npm run lint`, `npm run format:check` / `npm run format`
 - `npm test` — unit tests (`tsx --test tests/*.test.ts`); single file: `npx tsx --test tests/adf.test.ts`
-- `npm run test:e2e` — Playwright (`tests/*.spec.ts`); needs the app running on localhost:3000, uses system Chrome (override with `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, `TEST_BASE_URL`)
+- `npm run test:e2e` — Playwright (`tests/*.spec.ts`); needs the app running on localhost:3000 against a test DB seeded by `npm run test:e2e:seed` (262-vehicle fixture; start the app with that `DATABASE_URL` and `SITE_URL` unset), uses system Chrome (override with `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, `TEST_BASE_URL`)
 - `npm run build` then `npm run test:inventory` (needs `TEST_DATABASE_URL`, a throwaway Postgres DB whose name ends in `_test`; starts a fake S3 and the app) / `npm run test:integrations` (fixture STARTTLS SMTP server and temp app; needs OpenSSL and Chromium)
 - `npm run inventory:import` — read the dealr.cloud CSV from S3 and upsert it into Postgres; `npm run db:migrate` applies `db/schema.sql` first (see `docs/DEALR-INVENTORY.md`)
 - CI (`.github/workflows/checks.yml`) runs format:check, typecheck, lint, test, build, test:inventory, test:integrations, `npm audit --audit-level=high`.
