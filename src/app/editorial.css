@@ -506,9 +506,6 @@ h2 .gold {
   grid-column: 1/-1;
   padding: 40px 0;
 }
-.inventory-feature .preview-note {
-  margin-top: 40px;
-}
 .story-section {
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
@@ -955,10 +952,6 @@ h2 .gold {
     flex-direction: row;
     align-items: center;
     gap: 8px;
-  }
-  .inventory-feature .preview-note {
-    margin-top: 24px;
-    font-size: 8px;
   }
   .story-section {
     grid-template-columns: 1fr;

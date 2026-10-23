@@ -485,15 +485,6 @@ button:active,
   font-weight: 450;
   letter-spacing: -0.02em;
 }
-.preview-note {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 10px;
-  margin-top: 20px;
-}
 .status-dot {
   width: 5px;
   height: 5px;
@@ -501,19 +492,6 @@ button:active,
   background: var(--accent);
   display: inline-block;
   flex-shrink: 0;
-}
-.preview-banner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  padding: 13px var(--gutter);
-  background: #232323;
-  color: #cbc6bd;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
 }
 .film-card {
   padding: 0;
@@ -2419,23 +2397,6 @@ button:active,
   }
   .vehicle-card-bottom .mono {
     font-size: 9px;
-  }
-  .preview-note {
-    text-align: left;
-    justify-content: flex-start;
-    align-items: flex-start;
-    font-size: 9px;
-    margin-top: 30px;
-    line-height: 1.7;
-  }
-  .preview-note .status-dot {
-    margin-top: 5px;
-  }
-  .preview-banner {
-    justify-content: flex-start;
-    font-size: 8px;
-    line-height: 1.7;
-    padding: 12px 24px;
   }
   .film-card {
     aspect-ratio: 1.08;
