@@ -17,7 +17,7 @@ import { VehicleActions } from "@/components/vehicle-actions";
 import { PaymentCalculator } from "@/components/payment-calculator";
 import { LeadForm } from "@/components/lead-form";
 import { VehicleCard } from "@/components/vehicle-card";
-import { PreviewNotice, ButtonLink } from "@/components/ui";
+import { ButtonLink } from "@/components/ui";
 type Props = { params: Promise<{ vehicle: string[] }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vehicle } = await params;
@@ -79,7 +79,6 @@ export default async function VehiclePage({ params }: Props) {
           <span>Plus taxes, registration and applicable fees</span>
         </div>
       </div>
-      {data.isPreview && <PreviewNotice />}
       <div className="vehicle-jumpbar">
         <nav aria-label="Vehicle sections">
           <a href="#overview">Overview</a>
@@ -236,41 +235,39 @@ export default async function VehiclePage({ params }: Props) {
           Make it yours <ArrowUpRight size={17} />
         </a>
       </div>
-      {!data.isPreview && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Car",
-              name: v.name,
-              image: v.images,
-              vehicleIdentificationNumber: v.vin,
-              modelDate: String(v.year),
-              ...(v.mileage > 0
-                ? {
-                    mileageFromOdometer: {
-                      "@type": "QuantitativeValue",
-                      value: v.mileage,
-                      unitCode: "SMI",
-                    },
-                  }
-                : {}),
-              ...(v.price > 0
-                ? {
-                    offers: {
-                      "@type": "Offer",
-                      price: v.price,
-                      priceCurrency: "USD",
-                      availability: "https://schema.org/InStock",
-                      url: (process.env.SITE_URL || "") + vehicleHref(v),
-                    },
-                  }
-                : {}),
-            }).replace(/</g, "\\u003c"),
-          }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Car",
+            name: v.name,
+            image: v.images,
+            vehicleIdentificationNumber: v.vin,
+            modelDate: String(v.year),
+            ...(v.mileage > 0
+              ? {
+                  mileageFromOdometer: {
+                    "@type": "QuantitativeValue",
+                    value: v.mileage,
+                    unitCode: "SMI",
+                  },
+                }
+              : {}),
+            ...(v.price > 0
+              ? {
+                  offers: {
+                    "@type": "Offer",
+                    price: v.price,
+                    priceCurrency: "USD",
+                    availability: "https://schema.org/InStock",
+                    url: (process.env.SITE_URL || "") + vehicleHref(v),
+                  },
+                }
+              : {}),
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
       <Motion />
     </>
   );

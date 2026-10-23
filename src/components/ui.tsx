@@ -40,14 +40,6 @@ export function SectionHeading({
     </div>
   );
 }
-export function PreviewNotice({ inline = false }: { inline?: boolean }) {
-  return (
-    <p className={inline ? "preview-note" : "preview-banner"}>
-      <span className="status-dot" /> Inventory preview · Not live inventory.
-      Call to confirm current price and availability.
-    </p>
-  );
-}
 export function CornerMark() {
   return (
     <span className="corner-mark" aria-hidden="true">

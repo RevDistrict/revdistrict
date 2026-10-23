@@ -13,7 +13,6 @@ type ImportOptions = {
   capturedAt: string;
   siteUrl: string;
   dealerId: string;
-  isPreview?: boolean;
   legacyVehicles?: Pick<Vehicle, "id" | "vin" | "slug">[];
 };
 
@@ -73,7 +72,7 @@ export function parseDealrInventory(csv: string, options: ImportOptions) {
     throw new Error("Inventory site URL must be HTTPS without credentials.");
   if (!options.dealerId.trim())
     throw new Error("Expected DealerID is required.");
-  if (!options.isPreview) assertInventoryFresh(options.capturedAt);
+  assertInventoryFresh(options.capturedAt);
 
   let records: Record<string, string>[];
   try {
@@ -211,7 +210,7 @@ export function parseDealrInventory(csv: string, options: ImportOptions) {
       equipment: equipment.length ? { Features: [...new Set(equipment)] } : {},
       carfaxUrl: null,
       sourceUrl: new URL(vehicleHref({ id, slug }), origin.origin).href,
-      status: options.isPreview ? "preview" : "active",
+      status: "active",
     });
     if (!result.success)
       throw new Error(
@@ -222,7 +221,6 @@ export function parseDealrInventory(csv: string, options: ImportOptions) {
   return inventorySchema.parse({
     capturedAt: options.capturedAt,
     source: "dealr.cloud CSV export",
-    isPreview: options.isPreview ?? false,
     vehicles,
   });
 }

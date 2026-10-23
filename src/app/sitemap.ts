@@ -18,11 +18,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       "/contact-us/text",
       "/privacy-policy",
     ].map((path) => ({ url: base + path })),
-    ...(!data.isPreview
-      ? data.vehicles.map((v) => ({
-          url: base + vehicleHref(v),
-          lastModified: data.updatedAt,
-        }))
-      : []),
+    ...data.vehicles.map((v) => ({
+      url: base + vehicleHref(v),
+      lastModified: data.updatedAt,
+    })),
   ];
 }

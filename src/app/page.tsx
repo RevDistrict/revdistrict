@@ -21,10 +21,7 @@ export default async function Home() {
           WELCOME TO THE DISTRICT <ArrowUpRight size={18} />
         </span>
       </div>
-      <DriveSelector
-        vehicles={inventory.vehicles.map(toVehicleSummary)}
-        isPreview={inventory.isPreview}
-      />
+      <DriveSelector vehicles={inventory.vehicles.map(toVehicleSummary)} />
       <section className="story-section section" id="the-district">
         <div className="story-copy">
           <p className="eyebrow">THE PEOPLE BEHIND THE KEYS</p>

@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { toVehicleSummary } from "@/lib/vehicle";
 import { getInventory } from "@/lib/inventory";
 import { InventoryBrowser } from "@/components/inventory-browser";
-import { PreviewNotice } from "@/components/ui";
 export const metadata: Metadata = {
   title: "Find your next drive",
   description:
@@ -38,7 +37,6 @@ export default async function InventoryPage() {
           There’s a next chapter for everyone.
         </p>
       </section>
-      {data.isPreview && <PreviewNotice />}
       <section className="section inventory-section">
         <Suspense fallback={<p>Loading your collection...</p>}>
           <InventoryBrowser vehicles={data.vehicles.map(toVehicleSummary)} />

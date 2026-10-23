@@ -36,7 +36,6 @@ test("vendor columns produce stable vehicle URLs, ordered photos and public fiel
     'Quoted "CSV" description.',
   ]);
   assert.deepEqual(car.equipment.Features, ["Heated seats", "Backup camera"]);
-  assert.equal(data.isPreview, false);
   assert.equal(car.status, "active");
   const encoded = JSON.stringify(data);
   for (const privateValue of [
@@ -131,13 +130,6 @@ test("stale and future live exports are rejected; preview records stay explicitl
     () => assertInventoryFresh(new Date(Date.now() + 3600000).toISOString()),
     /invalid/,
   );
-  const data = parseDealrInventory(fixture, {
-    ...options,
-    isPreview: true,
-    capturedAt: "2020-01-01T00:00:00Z",
-  });
-  assert.equal(data.isPreview, true);
-  assert.ok(data.vehicles.every((v) => v.status === "preview"));
 });
 
 test("the CLI requires explicit full-feed confirmation", () => {

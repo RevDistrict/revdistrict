@@ -4,15 +4,9 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { Vehicle, DriveMode } from "@/lib/vehicle";
 import { driveModes, matchesMode } from "@/lib/vehicle";
-import { ButtonLink, PreviewNotice } from "./ui";
+import { ButtonLink } from "./ui";
 import { VehicleCard } from "./vehicle-card";
-export function DriveSelector({
-  vehicles,
-  isPreview,
-}: {
-  vehicles: Vehicle[];
-  isPreview: boolean;
-}) {
+export function DriveSelector({ vehicles }: { vehicles: Vehicle[] }) {
   const [mode, setMode] = useState<DriveMode>("all");
   const root = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -187,7 +181,6 @@ export function DriveSelector({
           </p>
         )}
       </div>
-      {isPreview && <PreviewNotice inline />}
     </section>
   );
 }

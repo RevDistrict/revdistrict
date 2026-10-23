@@ -3,6 +3,7 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { SMTPServer } from "smtp-server";
 import pg from "pg";
+import { testDatabaseUrl } from "./test-database-url.mjs";
 import { createServer as createTcpServer } from "node:net";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -54,8 +55,8 @@ try {
     mileage: 0,
     status: "active",
   };
-  assert.ok(process.env.TEST_DATABASE_URL, "Set TEST_DATABASE_URL.");
-  db = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL });
+  const databaseUrl = testDatabaseUrl();
+  db = new pg.Client({ connectionString: databaseUrl });
   await db.connect();
   await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");
   await db.query(await readFile("db/schema.sql", "utf8"));
@@ -64,7 +65,7 @@ try {
     [vehicle.id, vehicle.status, vehicle],
   );
   await db.query(
-    "INSERT INTO inventory_meta (singleton, captured_at, is_preview) VALUES (true, now(), false)",
+    "INSERT INTO inventory_meta (singleton, captured_at) VALUES (true, now())",
   );
   smtp = new SMTPServer({
     ...tls,
@@ -137,7 +138,7 @@ try {
         SITE_URL: origin,
         SITE_INDEXABLE: "false",
         NODE_EXTRA_CA_CERTS: cert,
-        DATABASE_URL: process.env.TEST_DATABASE_URL,
+        DATABASE_URL: databaseUrl,
         SMTP_HOST: "localhost",
         SMTP_PORT: String(smtp.server.address().port),
         SMTP_USER: "fixture-user",
@@ -170,7 +171,6 @@ try {
     inventory.includes("Photos coming soon") &&
       inventory.includes("fixture-active"),
   );
-  assert.ok(!inventory.includes("Inventory preview"));
   const detail = await (
     await fetch(`${origin}/inventory/fixture-car/fixture-active`)
   ).text();

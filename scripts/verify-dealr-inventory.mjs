@@ -6,12 +6,9 @@ import { createServer } from "node:net";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import pg from "pg";
+import { testDatabaseUrl } from "./test-database-url.mjs";
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
-assert.ok(
-  databaseUrl,
-  "Set TEST_DATABASE_URL to a throwaway Postgres database.",
-);
+const databaseUrl = testDatabaseUrl();
 const run = promisify(execFile);
 const fixture = await readFile("tests/fixtures/dealr-inventory.csv");
 let contents = fixture;
@@ -48,6 +45,7 @@ try {
     DATABASE_URL: databaseUrl,
     DEALR_FEED_MODE: "full",
     DEALR_DEALER_ID: "demo-dealer",
+    CRON_SECRET: "fixture-cron-secret",
     S3_BUCKET_NAME: "fixture-bucket",
     S3_INVENTORY_KEY: "inventory.csv",
     AWS_ENDPOINT_URL_S3: `http://127.0.0.1:${s3.address().port}`,
@@ -93,9 +91,19 @@ try {
     }
   }
   assert.ok(ready, "Compiled app boots");
+  const cron = `${origin}/api/cron/inventory`;
+  assert.equal((await fetch(cron)).status, 401);
+  assert.equal(
+    (await fetch(cron, { headers: { authorization: "Bearer wrong" } })).status,
+    401,
+  );
+  const cronRun = await fetch(cron, {
+    headers: { authorization: "Bearer fixture-cron-secret" },
+  });
+  assert.equal(cronRun.status, 200);
+  assert.equal((await cronRun.json()).vehicles, 2);
   const listing = await (await fetch(`${origin}/inventory`)).text();
   assert.ok(listing.includes("DEMO001") && listing.includes("DEMO002"));
-  assert.ok(!listing.includes("Inventory preview"));
   const detailPath = "/inventory/2024-acura-integra-demo-a-spec/DEMO001";
   const detail = await (await fetch(origin + detailPath)).text();
   assert.ok(detail.includes("31,990") && detail.includes("23,071"));
@@ -133,28 +141,8 @@ try {
       removedHtml.includes('content="noindex"'),
     "Removed stock renders the noindex not-found state, including streamed responses",
   );
-  await run(
-    process.execPath,
-    [
-      "--import",
-      "tsx",
-      "scripts/import-inventory.ts",
-      "--input",
-      "tests/fixtures/dealr-inventory.csv",
-      "--preview",
-    ],
-    { env },
-  );
-  assert.ok(
-    (await (await fetch(`${origin}/inventory`)).text()).includes(
-      "Inventory preview",
-    ),
-  );
-  assert.ok(
-    !(await (await fetch(`${origin}/sitemap.xml`)).text()).includes("DEMO001"),
-  );
   console.log(
-    "Verified local S3 import into Postgres, missing-object and stale-file retention, CSV vehicle pages, slug redirect, price refresh, removal and preview labeling.",
+    "Verified local S3 import into Postgres, missing-object and stale-file retention, CSV vehicle pages, slug redirect, price refresh, removal and the authenticated cron route.",
   );
 } finally {
   app?.kill();
