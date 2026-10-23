@@ -4,7 +4,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import pg from "pg";
-import legacy from "../data/inventory-preview.json";
+import legacy from "../data/legacy-vehicles.json";
 import {
   parseDealrInventory,
   MAX_INVENTORY_BYTES,

@@ -6,7 +6,7 @@ The app is a working Next.js build. It is not yet connected to RevDistrict's pro
 
 ## Inventory: keep dealr.cloud as the source of truth
 
-The site shows only the dealership's imported inventory. `src/data/inventory-preview.json` holds 262 vehicles captured from the old public dealer site on September 23, 2026; it is no longer shown anywhere and remains only as legacy slug data for URL redirects and as test data. Old vehicle paths resolve through the catch-all route, including slashes and punctuation in trim names.
+The site shows only the dealership's imported inventory. `src/data/legacy-vehicles.json` holds 262 vehicles captured from the old public dealer site on September 23, 2026; it is no longer shown anywhere and remains only as legacy slug data for URL redirects and as test data. Old vehicle paths resolve through the catch-all route, including slashes and punctuation in trim names.
 
 The source dealer site's body-type filters were used to classify vehicles: 92 cars, 113 SUVs, 35 trucks, 10 vans, and 12 other vehicles. Do not infer classes from model-name substrings. A few source records advertise mileage as zero; these display as mileage on request instead of implying an unused vehicle.
 

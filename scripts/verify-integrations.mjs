@@ -42,7 +42,7 @@ try {
   );
   const tls = { key: await readFile(key), cert: await readFile(cert) };
   const preview = JSON.parse(
-    await readFile("src/data/inventory-preview.json", "utf8"),
+    await readFile("src/data/legacy-vehicles.json", "utf8"),
   );
   const vehicle = {
     ...preview.vehicles[0],

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAdfLead, dealrLeadRecipient, leadLabels } from "../src/lib/adf";
 import { leadSchema } from "../src/lib/leads";
-import inventory from "../src/data/inventory-preview.json";
+import inventory from "../src/data/legacy-vehicles.json";
 import { vehicleSchema } from "../src/lib/vehicle";
 
 const base = {
