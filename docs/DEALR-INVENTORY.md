@@ -32,7 +32,8 @@ Production runs on Vercel with a Neon Postgres database. `vercel.json` schedules
 2. Set `CRON_SECRET` to a long random value.
 3. Set `DEALR_FEED_MODE=full` (complete active-inventory exports; delta feeds are unsupported), `SITE_URL` (final HTTPS origin) and `DEALR_DEALER_ID=452833` (the CSV's DealerID).
 4. Set `S3_BUCKET_NAME`, `S3_INVENTORY_KEY` (`FruitStand/theusedcarfactoryinventory.csv`; the bucket also holds a stray `FruitStandtheusedcarfactoryinventory.csv` and `FruitStand/hello.txt` that must not be used), `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Set `AWS_REGION` explicitly to the bucket region (`us-east-2`); Vercel presets it to the function region. The IAM user needs only `s3:GetObject` on the object and `s3:ListBucket` on the bucket.
-5. Alert on cron failures (non-200 from the route) and on stale data; see below.
+5. `npm run build` runs `scripts/check-env.mjs` first. On a production Vercel build (`VERCEL_ENV=production`) it fails if any of the variables above is missing, `DEALR_FEED_MODE` is not `full` or `SITE_URL` is not https. Other environments are not checked. SMTP variables are not checked because inquiry forms fail honestly without them.
+6. Alert on cron failures (non-200 from the route) and on stale data; see below.
 
 The same code runs from a terminal with `npm run inventory:import` (needs `tsx`, so install with `npm ci`, not `--omit=dev`) for manual runs or a host crontab.
 
