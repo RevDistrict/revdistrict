@@ -2,11 +2,11 @@
 
 The app is a working Next.js build. It is not yet connected to RevDistrict's production DMS or deployed to the dealership domain. No production messages were sent while building it.
 
-**October 14 update:** Adam confirmed full active-inventory CSV exports hourly under the same filename and supplied the credit iframe and ADF destination. The CSV/SFTP importer, provider iframe and ADF email delivery are implemented. Hosting/SFTP access, a populated export, SMTP credentials and provider-confirmed receipts remain outstanding. See [the inventory handoff](DEALR-INVENTORY.md).
+**October 14 update:** Adam confirmed full active-inventory CSV exports hourly under the same filename and supplied the credit iframe and ADF destination. The provider iframe and ADF email delivery are implemented. The CSV is now read from the dealership's S3 bucket and synced into Postgres by an hourly Vercel cron (see the inventory handoff). Hosting, SMTP credentials and provider-confirmed receipts remain outstanding. See [the inventory handoff](DEALR-INVENTORY.md).
 
 ## Inventory: keep dealr.cloud as the source of truth
 
-The preview contains 262 vehicles captured from the public dealer site on September 23, 2026, including original photos, prices, mileage, specifications, descriptions and equipment. These are review data, not a live feed. Preview pages label this clearly and are noindex by default. All old vehicle paths resolve through the catch-all route, including slashes and punctuation in trim names.
+The site shows only the dealership's imported inventory. `src/data/inventory-preview.json` holds 262 vehicles captured from the old public dealer site on September 23, 2026; it is no longer shown anywhere and remains only as legacy slug data for URL redirects and as test data. Old vehicle paths resolve through the catch-all route, including slashes and punctuation in trim names.
 
 The source dealer site's body-type filters were used to classify vehicles: 92 cars, 113 SUVs, 35 trucks, 10 vans, and 12 other vehicles. Do not infer classes from model-name substrings. A few source records advertise mileage as zero; these display as mileage on request instead of implying an unused vehicle.
 
@@ -19,9 +19,11 @@ Sources, checked September 23, 2026:
 
 ### What is implemented
 
-`src/lib/inventory.ts` loads a server-only HTTPS JSON endpoint from `INVENTORY_FEED_URL`, optionally using `INVENTORY_FEED_TOKEN` as a bearer credential. A Zod contract in `src/lib/vehicle.ts` validates it; only active records display. Responses are cached for five minutes. Missing configuration uses the clearly labeled preview. A configured but failed, invalid, or older-than-36-hours feed raises the page's designed error state instead of silently substituting the preview.
+`src/lib/inventory.ts` reads the `vehicles` and `inventory_meta` tables (`db/schema.sql`) through a server-only Postgres pool (`DATABASE_URL`). Every record is validated with the Zod contract in `src/lib/vehicle.ts`. A missing `DATABASE_URL`, an empty database or data older than 72 hours raises the page's designed error state; nothing is substituted.
 
-**The normalized JSON contract is ours. It is not a claimed dealr.cloud API schema.** `npm run inventory:import` now maps the supplied CSV columns into that contract, reading a local delivery file or downloading through verified SFTP. `INVENTORY_FILE_PATH` lets the site consume the resulting private snapshot without a separate HTTPS adapter service. The existing HTTPS feed remains an alternative. See [the current importer handoff](DEALR-INVENTORY.md) before enabling live imports; only a header-only sample was available. No undocumented private API or marketplace scraper is used.
+**The normalized vehicle contract is ours. It is not a claimed dealr.cloud API schema.** `src/lib/inventory-import.ts` downloads the CSV from S3, maps its columns into that contract (`src/lib/dealr-inventory.ts`) and syncs the database. It runs from the `/api/cron/inventory` route (Vercel Cron, hourly) or from `npm run inventory:import`. See [the importer handoff](DEALR-INVENTORY.md). No undocumented private API or marketplace scraper is used.
+
+The stored vehicle JSON for each record follows `vehicleSchema`; the envelope below is the shape the importer builds before saving:
 
 The feed envelope is:
 
@@ -33,7 +35,7 @@ The feed envelope is:
 }
 ```
 
-Use `vehicleSchema` for every record. Important fields: stable provider ID, legacy slug, VIN, stock, advertised price, mileage, make/model/trim, body type, drivetrain, transmission, engine, colors, ordered HTTPS image URLs, description paragraphs, equipment groups, CARFAX link, canonical source URL, and active/sold/inactive status. IDs and slugs must be mapped consistently from old listings. Do not index the preview as inventory for sale.
+Use `vehicleSchema` for every record. Important fields: stable provider ID, legacy slug, VIN, stock, advertised price, mileage, make/model/trim, body type, drivetrain, transmission, engine, colors, ordered HTTPS image URLs, description paragraphs, equipment groups, CARFAX link, canonical source URL, and status (always `active`; vehicles not in the latest export are deleted). IDs and slugs must be mapped consistently from old listings.
 
 ### Photo delivery contract
 
@@ -51,7 +53,7 @@ Remaining provider/host requests:
 3. An SMTP account and verified sending address, a safe ADF test destination, and confirmation that each inquiry type reaches the correct dealership workflow.
 4. Confirmation that the supplied credit iframe is approved for the final domain, plus a provider-authorized application receipt test and any supported vehicle-prefill parameters.
 
-Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test feed before launch. Agree the sold-vehicle policy: removed records render the noindex not-found page and offer inventory navigation (404 before streaming, or a streamed 200 response). A sold archive/410 response can be added if the dealer wants it.
+Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test export before launch. Sold vehicles are removed from the export and therefore the site: removed records render the noindex not-found page and offer inventory navigation (404 before streaming, or a streamed 200 response). A sold archive/410 response can be added if the dealer wants it.
 
 Scraping Facebook or KSL back into this site is not the recommended architecture. It would make downstream listings the source of truth and add duplication and stale-availability problems. Feed marketplaces outward from dealr.cloud as they do today.
 
@@ -77,7 +79,7 @@ Vehicle-page links retain `?entry_id=<provider ID>` for context on our page. Bec
 
 The custom credit form, financial schema/configuration and relay have been removed. `POST /api/finance` returns 410 without reading or forwarding a body, protecting old clients from using the retired flow. Remove old `FINANCE_APPLICATION_ENABLED`, `FINANCE_WEBHOOK_URL` and `FINANCE_WEBHOOK_TOKEN` settings. The provider iframe owns collection, validation, authorizations and delivery; this website's API receives no application fields. `/financing/terms` directs visitors to the provider's current disclosures, and `/privacy-policy` describes this arrangement. The page remains noindex, no-store and no-referrer. The calculator remains browser-only.
 
-No real application or lead was submitted during development. `npm run test:integrations` uses a local HTTPS inventory feed and authenticated STARTTLS SMTP fixture, and intercepts the provider frame with local test content. Provider receipt and its own form's accessibility/behavior require separate authorized checks.
+No real application or lead was submitted during development. `npm run test:integrations` seeds a throwaway Postgres database (`TEST_DATABASE_URL`, name must end in `_test`) and uses an authenticated STARTTLS SMTP fixture, and intercepts the provider frame with local test content. Provider receipt and its own form's accessibility/behavior require separate authorized checks.
 
 ## Video replacement
 

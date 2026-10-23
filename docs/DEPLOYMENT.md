@@ -1,26 +1,29 @@
-# Hosting on Namecheap
+# Hosting
 
-The owners' screenshot says Namecheap is their **domain host** and dealr.cloud currently runs the website. That establishes the registrar, not the available web-hosting plan. Confirm the actual plan before choosing the deployment target.
+**Update:** the site is planned for Vercel with a Neon Postgres database; Namecheap remains the domain registrar and DNS host. The hourly inventory import is a Vercel Cron job (`vercel.json`, `/api/cron/inventory` at :15), which requires a Pro plan. See [the inventory handoff](DEALR-INVENTORY.md) for the environment variables, including `DATABASE_URL`, `CRON_SECRET`, `S3_*`, `AWS_*` (set `AWS_REGION` explicitly) and `DEALR_DEALER_ID`.
 
-This app requires a supported Node.js runtime. It is not a static HTML export: live inventory and lead delivery run on the server. Use Node 24 LTS for deployment (the locked Next.js release requires at least Node 20.9) and a hosting plan with sufficient memory to run Next.js. Check the installed Next.js package's engine requirements when changing framework versions.
+The Namecheap/cPanel notes below are a fallback only. A cPanel host can run `server.cjs`, but it has no Vercel Cron: schedule `npm run inventory:import` with the host's cron and keep `tsx` installed (`npm ci`).
 
-Namecheap documents custom Next.js servers under cPanel's **Setup Node.js App**:
-[Namecheap Next.js deployment guide](https://www.namecheap.com/support/knowledgebase/article.aspx/10686/29/how-to-deploy-reactjs-vitejs-react-native-and-nextjs-applications-in-cpanel/)
+The owners' screenshot says Namecheap is their **domain host** and dealr.cloud currently runs the website. That establishes the registrar, not a web-hosting plan.
 
-The article's sample version table is old; use the requirements of the version in this project's lockfile. Namecheap also supports Node deployments on suitable VPS plans. If the existing plan cannot run this version, keep DNS at Namecheap and use a compatible Node host or upgrade the hosting plan.
+This app requires a supported Node.js runtime. It is not a static HTML export: live inventory and lead delivery run on the server. Use Node 24 LTS (the locked Next.js release requires at least Node 20.9). Check the installed Next.js package's engine requirements when changing framework versions.
 
-## Local preview
+Namecheap documents custom Next.js servers under cPanel's **Setup Node.js App**: [Namecheap Next.js deployment guide](https://www.namecheap.com/support/knowledgebase/article.aspx/10686/29/how-to-deploy-reactjs-vitejs-react-native-and-nextjs-applications-in-cpanel/). The article's sample version table is old; use the requirements of the version in this project's lockfile.
+
+## Local development
 
 ```sh
 npm ci
+npm run db:migrate   # DATABASE_URL pointing at a local Postgres
+npm run inventory:import -- --input tests/fixtures/dealr-inventory.csv   # see DEALR-INVENTORY.md
 npm run dev
 ```
 
-Open http://localhost:3000. No environment variables are required for the labeled inventory preview. Forms will not claim delivery without an configured SMTP delivery.
+Open http://localhost:3000. `DATABASE_URL` is required: with no database or no import, inventory pages show the error state. Forms will not claim delivery without configured SMTP delivery.
 
 ## Production build
 
-Set production environment variables in the host's secret settings, using `.env.example` as a checklist. Never commit actual values. `SITE_URL` must be the final HTTPS origin (no trailing slash). Keep `SITE_INDEXABLE=false` until the approved live feed and lead flow have been tested.
+Set production environment variables in the host's secret settings, using `.env.example` as a checklist. Never commit actual values. `SITE_URL` must be the final HTTPS origin (no trailing slash). Keep `SITE_INDEXABLE=false` until the live import and lead flow have been tested.
 
 ```sh
 npm ci
@@ -37,16 +40,16 @@ Upload `src/`, `public/`, `.next/`, `package.json`, `package-lock.json`, `next.c
 
 ## Launch sequence
 
-The October 14 provider conversation confirms dealership-owned hosting and SFTP delivery. Follow [the current inventory handoff](DEALR-INVENTORY.md); the supplied dealr.cloud iframe and ADF email adapter are now integrated. Configure the host-owned SMTP account before enabling inquiry delivery. The dependency audit findings recorded in that handoff must also be resolved before deployment.
+Inventory arrives through the dealership's S3 bucket; follow [the current inventory handoff](DEALR-INVENTORY.md). The supplied dealr.cloud iframe and ADF email adapter are integrated. Configure the host-owned SMTP account before enabling inquiry delivery.
 
-1. Connect and validate the dealer-authorized inventory adapter and authenticated SMTP sender on a staging origin.
+1. Run the S3 import against the production database and validate the authenticated SMTP sender on a staging origin.
 2. Verify the supplied dealr.cloud credit iframe at `/financing/apply` on the final domain and confirm a provider-authorized test receipt. Confirm ADF inbox/routing, sender-domain authentication and provider-enforced onward TLS. See `INTEGRATIONS.md` for configuration and remaining checks.
 3. Confirm the new domain, business email, logo treatment, phone/hours and legal copy with the dealer.
 4. Replace the two temporary video slots if the new films are ready. Review captions and posters.
 5. Configure HTTPS, environment variables, trusted proxy headers and shared abuse protection. Disable request-body capture in proxy, server and monitoring logs; verify no lead or financial payloads appear. Confirm encrypted storage and access controls at the provider/relay.
 6. Smoke-test home → inventory → vehicle → inquiry, individual/joint applications, consignment/trade/contact/text-back forms, phone/maps, and provider-confirmed CRM/application test receipts. Use approved synthetic test identities and destinations.
 7. Point the new domain through Namecheap DNS. Preserve old `/inventory/<slug>/<id>` paths with path-preserving 301 redirects at the old host. This app also redirects `/home`, `/contact`, and `/trade-in` aliases.
-8. Enable `SITE_INDEXABLE=true` only with the real feed active, then rebuild/restart. Check canonical URLs, sitemap, robots, and structured vehicle data.
-9. Monitor feed freshness and relay delivery. Ensure sold vehicles disappear and source photo links remain valid.
+8. Enable `SITE_INDEXABLE=true` only with the live import running, then redeploy. Check canonical URLs, sitemap, robots, and structured vehicle data.
+9. Monitor cron runs (a failed import keeps old data for up to 72 hours before the site errors) and relay delivery. Ensure sold vehicles disappear and source photo links remain valid.
 
 No DNS changes or public deployment were made during this build.

@@ -1,5 +1,9 @@
 # Verification and review handoff
 
+## October 23 inventory move to S3 and Postgres
+
+Inventory now comes from the dealership's S3 bucket into Postgres on an hourly Vercel cron, replacing the SFTP importer and JSON snapshot below (those sections are historical). Checks: TypeScript, lint, formatting, build, 19 unit tests, `npm run test:inventory` (fake S3, throwaway Postgres, the authenticated cron route, stale-file and missing-object retention, removal) and `npm audit` (zero vulnerabilities after updating Next.js to 16.4.3 and zod). A real import of the live 271-vehicle CSV into a local database succeeded. `npm run test:integrations` intermittently fails an axe color-contrast check on the animated "FINDING YOUR NEXT DRIVE" label, also on the previous commit and Next.js version; it is not caused by this change and is unresolved. Not yet verified: the Vercel deployment and cron, Neon SSL, and a production run with the real IAM key.
+
 ## October 14 latest provider email: iframe and ADF
 
 Read all nine messages in the **New Website & FTP Feed** thread, including [Adam’s 20:19 UTC reply](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d), and the supplied ADF example/specification. `/financing/apply` now embeds his exact credit-application URL. The old native credit collection/relay was removed; its endpoint returns 410. All six inquiry types share the new authenticated TLS SMTP/ADF adapter and the supplied dealership destination. Inventory setup now records confirmed full Active exports hourly with the same filename. Configuration and outstanding host/provider checks are in `INTEGRATIONS.md`.
