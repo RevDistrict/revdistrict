@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
-    "build": "node scripts/check-env.mjs && next build",
+    "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
@@ -16,7 +16,8 @@
     "inventory:import": "node --import tsx scripts/import-inventory.ts",
     "test:inventory": "node scripts/verify-dealr-inventory.mjs",
     "db:migrate": "node --import tsx scripts/migrate.ts",
-    "test:e2e:seed": "node scripts/seed-test-inventory.mjs"
+    "test:e2e:seed": "node scripts/seed-test-inventory.mjs",
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

@@ -48,7 +48,7 @@ Inventory arrives through the dealership's S3 bucket; follow [the current invent
 4. Replace the two temporary video slots if the new films are ready. Review captions and posters.
 5. Configure HTTPS, environment variables, trusted proxy headers and shared abuse protection. Disable request-body capture in proxy, server and monitoring logs; verify no lead or financial payloads appear. Confirm encrypted storage and access controls at the provider/relay.
 6. Smoke-test home → inventory → vehicle → inquiry, individual/joint applications, consignment/trade/contact/text-back forms, phone/maps, and provider-confirmed CRM/application test receipts. Use approved synthetic test identities and destinations.
-7. Point the new domain through Namecheap DNS. Preserve old `/inventory/<slug>/<id>` paths with path-preserving 301 redirects at the old host. This app also redirects `/home`, `/contact`, and `/trade-in` aliases.
+7. Point the new domain through Namecheap DNS. This app redirects the `/home`, `/contact`, and `/trade-in` aliases.
 8. Enable `SITE_INDEXABLE=true` only with the live import running, then redeploy. Check canonical URLs, sitemap, robots, and structured vehicle data.
 9. Monitor cron runs (a failed import keeps old data for up to 72 hours before the site errors) and relay delivery. Ensure sold vehicles disappear and source photo links remain valid.
 

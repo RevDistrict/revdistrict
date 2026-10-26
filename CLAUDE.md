@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` then `npm run test:inventory` (needs `TEST_DATABASE_URL`, a throwaway Postgres DB whose name ends in `_test`; starts a fake S3 and the app) / `npm run test:integrations` (fixture STARTTLS SMTP server and temp app; needs OpenSSL and Chromium)
 - `npm run inventory:import` — read the dealr.cloud CSV from S3 and upsert it into Postgres; `npm run db:migrate` applies `db/schema.sql` first (see `docs/DEALR-INVENTORY.md`)
 - CI (`.github/workflows/checks.yml`) runs format:check, typecheck, lint, test, build, test:inventory, test:integrations, `npm audit --audit-level=high`.
+- Vercel builds run `npm run vercel-build` (`scripts/vercel-build.mjs`: env check, production-only `db:migrate`, then `next build`).
 - Production runs `server.cjs` (custom Node server wrapping Next, see `docs/DEPLOYMENT.md`).
 
 ## Architecture

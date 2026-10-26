@@ -7,7 +7,7 @@ dealr.cloud delivers an hourly full-inventory CSV through AWS Transfer Family in
 - dealr.cloud sends inventory files to a destination the dealership owns (AWS Transfer Family backed by an S3 bucket). We read that bucket directly with an IAM key; we do not pull from a dealr.cloud server.
 - Adam at dealr.cloud confirmed standard CSV delivery, hourly by default. His `Generic-CSV-Sample.csv` contains **58 column names and one entirely empty row**, not a populated vehicle example. The exact supplied file is preserved as `tests/fixtures/dealr-schema.csv`.
 - Adam’s latest reply confirms each export includes all currently Active vehicles and sends the same filename hourly. The server owner decides whether to archive old uploads or replace the stored file.
-- The supplied credit iframe is `https://staging.dealr.website/39984`. The supplied ADF inbox is `dealer-the-used-car-factory@leads.dealrcloud.com`, with an ADF 1.0 spec and example. Both are now implemented in the website.
+- The supplied credit iframe is `https://staging.dealr.website/39984`, the default for `CREDIT_APPLICATION_URL`; set that variable to the production URL when dealr.cloud supplies it. The supplied ADF inbox is `dealer-the-used-car-factory@leads.dealrcloud.com`, with an ADF 1.0 spec and example. Both are now implemented in the website.
 
 Sources: [Josh's Slack request](https://agentboostmarketing.slack.com/archives/C0C9UNS3A1W/p1792005605437029), [Adam's clarification](https://mail.google.com/mail/u/0/#all/1a13b895bb58bccb), [Adam's latest confirmation](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d).
 
@@ -28,11 +28,11 @@ Drop `--input` to download the S3 object instead (needs `S3_*`, `AWS_*` and the 
 
 Production runs on Vercel with a Neon Postgres database. `vercel.json` schedules `GET /api/cron/inventory` at 15 minutes past every hour. Vercel sends `Authorization: Bearer $CRON_SECRET`; the route returns 401 for anything else, and for everyone if `CRON_SECRET` is unset. Hourly crons need a Vercel Pro plan.
 
-1. Set `DATABASE_URL` and run `npm run db:migrate` once against it (idempotent).
+1. Set `DATABASE_URL` (Neon's pooled connection string). Production Vercel builds apply `db/schema.sql` automatically (the `vercel-build` script runs `scripts/migrate.ts`, which is idempotent); locally run `npm run db:migrate`.
 2. Set `CRON_SECRET` to a long random value.
 3. Set `DEALR_FEED_MODE=full` (complete active-inventory exports; delta feeds are unsupported), `SITE_URL` (final HTTPS origin) and `DEALR_DEALER_ID=452833` (the CSV's DealerID).
 4. Set `S3_BUCKET_NAME`, `S3_INVENTORY_KEY` (`FruitStand/theusedcarfactoryinventory.csv`; the bucket also holds a stray `FruitStandtheusedcarfactoryinventory.csv` and `FruitStand/hello.txt` that must not be used), `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Set `AWS_REGION` explicitly to the bucket region (`us-east-2`); Vercel presets it to the function region. The IAM user needs only `s3:GetObject` on the object and `s3:ListBucket` on the bucket.
-5. `npm run build` runs `scripts/check-env.mjs` first. On a production Vercel build (`VERCEL_ENV=production`) it fails if any of the variables above is missing, `DEALR_FEED_MODE` is not `full` or `SITE_URL` is not https. Other environments are not checked. SMTP variables are not checked because inquiry forms fail honestly without them.
+5. The `vercel-build` script (which Vercel runs instead of `build`) runs `scripts/check-env.mjs` first. On a production build (`VERCEL_ENV=production`) it fails if any of the variables above is missing, `DEALR_FEED_MODE` is not `full` or `SITE_URL` is not https. Other environments are not checked. SMTP variables are not checked because inquiry forms fail honestly without them.
 6. Alert on cron failures (non-200 from the route) and on stale data; see below.
 
 The same code runs from a terminal with `npm run inventory:import` (needs `tsx`, so install with `npm ci`, not `--omit=dev`) for manual runs or a host crontab.
