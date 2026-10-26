@@ -25,10 +25,28 @@ const s3 = createHttpServer((request, response) => {
   });
   response.end(request.method === "HEAD" ? undefined : contents);
 });
+const alerts = [];
+let resendDown = false;
+const resend = createHttpServer((request, response) => {
+  let raw = "";
+  request.on("data", (chunk) => {
+    raw += chunk;
+  });
+  request.on("end", () => {
+    if (resendDown || request.headers.authorization !== "Bearer fixture-key") {
+      response.writeHead(500).end("{}");
+      return;
+    }
+    alerts.push(JSON.parse(raw));
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ id: "fixture-alert-id" }));
+  });
+});
 let app;
 const db = new pg.Client({ connectionString: databaseUrl });
 try {
   await new Promise((resolve) => s3.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => resend.listen(0, "127.0.0.1", resolve));
   await db.connect();
   await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");
   await run(process.execPath, ["--import", "tsx", "scripts/migrate.ts"], {
@@ -46,6 +64,10 @@ try {
     DEALR_FEED_MODE: "full",
     DEALR_DEALER_ID: "demo-dealer",
     CRON_SECRET: "fixture-cron-secret",
+    EMERGENCY_EMAIL: "alerts@example.test",
+    RESEND_API_URL: `http://127.0.0.1:${resend.address().port}/emails`,
+    RESEND_API_KEY: "fixture-key",
+    RESEND_FROM: "website@example.test",
     S3_BUCKET_NAME: "fixture-bucket",
     S3_INVENTORY_KEY: "inventory.csv",
     AWS_ENDPOINT_URL_S3: `http://127.0.0.1:${s3.address().port}`,
@@ -102,6 +124,31 @@ try {
   });
   assert.equal(cronRun.status, 200);
   assert.equal((await cronRun.json()).vehicles, 2);
+  assert.equal(alerts.length, 0, "A successful import sends no alert");
+  // A failed scheduled import emails EMERGENCY_EMAIL and still reports failure.
+  const authorization = { authorization: "Bearer fixture-cron-secret" };
+  modified = new Date(Date.now() - 96 * 60 * 60 * 1000);
+  const failed = await fetch(cron, { headers: authorization });
+  assert.equal(failed.status, 500);
+  assert.equal(alerts.length, 1);
+  assert.deepEqual(alerts[0].to, ["alerts@example.test"]);
+  assert.match(alerts[0].subject, /import failed/);
+  assert.match(alerts[0].text, /Stage: download/);
+  assert.ok(
+    !alerts[0].text.includes("fixture-bucket") &&
+      !alerts[0].text.includes("fixture-key"),
+    "The alert leaks no bucket or credentials",
+  );
+  resendDown = true;
+  modified = new Date(Date.now() - 97 * 60 * 60 * 1000);
+  assert.equal(
+    (await fetch(cron, { headers: authorization })).status,
+    500,
+    "An unsendable alert cannot change the cron result",
+  );
+  assert.equal(alerts.length, 1);
+  resendDown = false;
+  modified = new Date();
   const listing = await (await fetch(`${origin}/inventory`)).text();
   assert.ok(listing.includes("DEMO001") && listing.includes("DEMO002"));
   const detailPath = "/inventory/2024-acura-integra-demo-a-spec/DEMO001";
@@ -142,10 +189,11 @@ try {
     "Removed stock renders the noindex not-found state, including streamed responses",
   );
   console.log(
-    "Verified local S3 import into Postgres, missing-object and stale-file retention, CSV vehicle pages, slug redirect, price refresh, removal and the authenticated cron route.",
+    "Verified local S3 import into Postgres, missing-object and stale-file retention, CSV vehicle pages, slug redirect, price refresh, removal, the authenticated cron route and the failure alert email.",
   );
 } finally {
   app?.kill();
   await db.end();
   await new Promise((resolve) => s3.close(resolve));
+  await new Promise((resolve) => resend.close(resolve));
 }
