@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 import pg from "pg";
 
 async function main() {
-  const url = process.env.DATABASE_URL;
+  // Neon recommends a direct (unpooled) connection for schema changes.
+  const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
   if (!url) throw new Error("Missing DATABASE_URL.");
   const client = new pg.Client({ connectionString: url });
   await client.connect();
