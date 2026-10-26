@@ -2,7 +2,7 @@
 
 The app is a working Next.js build. It is not yet connected to RevDistrict's production DMS or deployed to the dealership domain. No production messages were sent while building it.
 
-**October 14 update:** Adam confirmed full active-inventory CSV exports hourly under the same filename and supplied the credit iframe and ADF destination. The provider iframe and ADF email delivery are implemented. The CSV is now read from the dealership's S3 bucket and synced into Postgres by an hourly Vercel cron (see the inventory handoff). Hosting, SMTP credentials and provider-confirmed receipts remain outstanding. See [the inventory handoff](DEALR-INVENTORY.md).
+**October 14 update:** Adam confirmed full active-inventory CSV exports hourly under the same filename and supplied the credit iframe and ADF destination. The provider iframe and ADF email delivery are implemented. The CSV is now read from the dealership's S3 bucket and synced into Postgres by an hourly Vercel cron (see the inventory handoff). Hosting, Resend credentials and provider-confirmed receipts remain outstanding. See [the inventory handoff](DEALR-INVENTORY.md).
 
 ## Inventory: keep dealr.cloud as the source of truth
 
@@ -50,7 +50,7 @@ Ask Buddy to arrange the dealr.cloud introduction. The conversation screenshots 
 Remaining provider/host requests:
 1. A populated export, exact CSV path, DealerID, delivery access and completed-upload convention.
 2. Confirmation of photo/option separators, promotional-price precedence and old/new vehicle-ID correspondence.
-3. An SMTP account and verified sending address, a safe ADF test destination, and confirmation that each inquiry type reaches the correct dealership workflow.
+3. A Resend account with a verified sending domain, a safe ADF test destination, and confirmation that each inquiry type reaches the correct dealership workflow.
 4. Confirmation that the supplied credit iframe is approved for the final domain, plus a provider-authorized application receipt test and any supported vehicle-prefill parameters.
 
 Validate a price change, one new listing, reordered images, and a sold vehicle in a provider test export before launch. Sold vehicles are removed from the export and therefore the site: removed records render the noindex not-found page and offer inventory navigation (404 before streaming, or a streamed 200 response). A sold archive/410 response can be added if the dealer wants it.
@@ -59,15 +59,15 @@ Scraping Facebook or KSL back into this site is not the recommended architecture
 
 ## Leads: ADF email to dealr.cloud
 
-Contact, trade valuation, consignment, text-back, vehicle inquiry and test-drive forms all post to `/api/leads`. The server retains origin/content-type checks, bounded request validation, consent requirements, honeypot and in-process rate limiting. `src/lib/adf.ts` maps every intent to the supplied ADF 1.0 specification. `src/lib/adf-delivery.ts` sends it through authenticated, certificate-verified SMTP using Nodemailer. No lead contents are stored locally or logged.
+Contact, trade valuation, consignment, text-back, vehicle inquiry and test-drive forms all post to `/api/leads`. The server retains origin/content-type checks, bounded request validation, consent requirements, honeypot and in-process rate limiting. `src/lib/adf.ts` maps every intent to the supplied ADF 1.0 specification. `src/lib/adf-delivery.ts` sends it through the Resend HTTPS API. No lead contents are stored locally or logged.
 
 Adam supplied `dealer-the-used-car-factory@leads.dealrcloud.com` in his [October 14 reply](https://mail.google.com/mail/u/0/#all/1a13c11e7e54cf2d). It is the default destination. `ADF_LEAD_TO` allows a host-controlled, dealer-approved destination or isolated test inbox; visitors cannot choose recipients. Josh noted that the dealership may want particular routing, so confirm the inbox and CRM assignment with them before launch.
 
-Configure `SITE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` in the host's environment. `SMTP_FROM` is a single verified email address whose bounces the dealership monitors. Port 465 uses implicit TLS; other ports require STARTTLS. Certificate verification cannot be disabled by an application setting. Use an SMTP provider that enforces encrypted onward delivery to the lead mailbox; STARTTLS here protects the website-to-SMTP hop. The host must verify that provider's onward TLS policy, storage encryption, retention, access controls and sender-domain SPF/DKIM/DMARC configuration. No provider account is created by this code.
+Configure `SITE_URL`, `RESEND_API_KEY` and `RESEND_FROM` in the host's environment. `RESEND_FROM` is a single email address on a domain verified in Resend (SPF/DKIM records at the DNS host); bounces go to that sender and the dealership should monitor it. The server `POST`s to `https://api.resend.com/emails` over HTTPS with the key as a Bearer token, never follows redirects, times out after ten seconds and sends the lead ID as the `Idempotency-Key`. The ADF XML is attached as `lead.xml`; Resend derives the MIME type from the filename (confirm `application/xml` on the first real test send). Resend's free plan allows 3,000 emails a month and 100 a day. No account is created by this code. The host must verify Resend's retention and access controls and the lead mailbox's onward TLS policy.
 
 Each message has a generated reference in its Message-ID and ADF prospect ID, a brief text part, and an `application/xml` attachment named `lead.xml`, as specified in the supplied ADF transfer mechanism. The ADF contains contact details, request intent, customer message, separate contact/text consent and requested test-drive date/time. Inquiry vehicle facts (ID, VIN, stock, year/make/model) come from server inventory rather than browser-supplied names. Customer trade/consignment information is identified separately. General inquiries or unavailable inventory leave required vehicle facts empty instead of inventing a vehicle; confirm those messages import correctly with dealr.cloud. Consignment is a selling consultation, not a signed agreement; text-back requests preserve SMS consent but do not send an SMS automatically.
 
-Missing or invalid SMTP configuration returns 503 and offers the existing phone/email. A positive response is returned only after SMTP accepts the message. SMTP acceptance is not proof of CRM ingestion; bounces and provider-confirmed receipts must be checked during handoff. Rejection or timeout returns an unconfirmed-delivery response and reference; there are no automatic retries. Remove obsolete `LEAD_WEBHOOK_URL` / `LEAD_WEBHOOK_TOKEN` configuration.
+Missing or invalid Resend configuration returns 503 and offers the existing phone/email. A positive response is returned only after Resend returns a message id. Acceptance by Resend is not proof of CRM ingestion; bounces and provider-confirmed receipts must be checked during handoff. Rejection or timeout returns an unconfirmed-delivery response and reference; there are no automatic retries. Remove obsolete `LEAD_WEBHOOK_URL` / `LEAD_WEBHOOK_TOKEN` and any `SMTP_*` configuration.
 
 Before production, configure trusted proxy headers and shared edge/WAF abuse protection. The in-process limiter does not coordinate replicas. Keep request-body capture disabled in hosting and monitoring. No financial application data belongs in these general inquiry forms. The public business contact email remains unchanged.
 
@@ -79,7 +79,7 @@ Vehicle-page links retain `?entry_id=<provider ID>` for context on our page. Bec
 
 The custom credit form, financial schema/configuration and relay have been removed. `POST /api/finance` returns 410 without reading or forwarding a body, protecting old clients from using the retired flow. Remove old `FINANCE_APPLICATION_ENABLED`, `FINANCE_WEBHOOK_URL` and `FINANCE_WEBHOOK_TOKEN` settings. The provider iframe owns collection, validation, authorizations and delivery; this website's API receives no application fields. `/financing/terms` directs visitors to the provider's current disclosures, and `/privacy-policy` describes this arrangement. The page remains noindex, no-store and no-referrer. The calculator remains browser-only.
 
-No real application or lead was submitted during development. `npm run test:integrations` seeds a throwaway Postgres database (`TEST_DATABASE_URL`, name must end in `_test`) and uses an authenticated STARTTLS SMTP fixture, and intercepts the provider frame with local test content. Provider receipt and its own form's accessibility/behavior require separate authorized checks.
+No real application or lead was submitted during development. `npm run test:integrations` seeds a throwaway Postgres database (`TEST_DATABASE_URL`, name must end in `_test`) and uses a local fake of the Resend API, and intercepts the provider frame with local test content. Provider receipt and its own form's accessibility/behavior require separate authorized checks.
 
 ## Video replacement
 

@@ -19,7 +19,7 @@ npm run inventory:import -- --input tests/fixtures/dealr-inventory.csv   # see D
 npm run dev
 ```
 
-Open http://localhost:3000. `DATABASE_URL` is required: with no database or no import, inventory pages show the error state. Forms will not claim delivery without configured SMTP delivery.
+Open http://localhost:3000. `DATABASE_URL` is required: with no database or no import, inventory pages show the error state. Forms will not claim delivery without configured Resend delivery.
 
 ## Production build
 
@@ -40,9 +40,9 @@ Upload `src/`, `public/`, `.next/`, `package.json`, `package-lock.json`, `next.c
 
 ## Launch sequence
 
-Inventory arrives through the dealership's S3 bucket; follow [the current inventory handoff](DEALR-INVENTORY.md). The supplied dealr.cloud iframe and ADF email adapter are integrated. Configure the host-owned SMTP account before enabling inquiry delivery.
+Inventory arrives through the dealership's S3 bucket; follow [the current inventory handoff](DEALR-INVENTORY.md). The supplied dealr.cloud iframe and ADF email adapter are integrated. Create a Resend account, verify the sending domain and set `RESEND_API_KEY` and `RESEND_FROM` before enabling inquiry delivery.
 
-1. Run the S3 import against the production database and validate the authenticated SMTP sender on a staging origin.
+1. Run the S3 import against the production database and validate the Resend sender on a staging origin.
 2. Verify the supplied dealr.cloud credit iframe at `/financing/apply` on the final domain and confirm a provider-authorized test receipt. Confirm ADF inbox/routing, sender-domain authentication and provider-enforced onward TLS. See `INTEGRATIONS.md` for configuration and remaining checks.
 3. Confirm the new domain, business email, logo treatment, phone/hours and legal copy with the dealer.
 4. Replace the two temporary video slots if the new films are ready. Review captions and posters.

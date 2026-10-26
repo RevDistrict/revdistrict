@@ -1,46 +1,20 @@
 import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { SMTPServer } from "smtp-server";
+import { createServer as createHttpServer } from "node:http";
 import pg from "pg";
 import { testDatabaseUrl } from "./test-database-url.mjs";
 import { createServer as createTcpServer } from "node:net";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 
-// All submitted data and SMTP/HTTPS destinations are isolated local fixtures.
-const dir = await mkdtemp(join(tmpdir(), "revdistrict-integration-"));
-let app, db, smtp, browser;
+// All submitted data and email destinations are isolated local fixtures.
+let app, db, mail, browser;
 let logs = "";
 const received = [];
 let rejectLead = false;
+let omitMessageId = false;
 try {
-  const key = join(dir, "key.pem"),
-    cert = join(dir, "cert.pem");
-  execFileSync(
-    "openssl",
-    [
-      "req",
-      "-x509",
-      "-newkey",
-      "rsa:2048",
-      "-nodes",
-      "-days",
-      "1",
-      "-subj",
-      "/CN=localhost",
-      "-addext",
-      "subjectAltName=DNS:localhost,IP:127.0.0.1",
-      "-keyout",
-      key,
-      "-out",
-      cert,
-    ],
-    { stdio: "ignore" },
-  );
-  const tls = { key: await readFile(key), cert: await readFile(cert) };
   const preview = JSON.parse(
     await readFile("src/data/legacy-vehicles.json", "utf8"),
   );
@@ -67,56 +41,41 @@ try {
   await db.query(
     "INSERT INTO inventory_meta (singleton, captured_at) VALUES (true, now())",
   );
-  smtp = new SMTPServer({
-    ...tls,
-    secure: false,
-    logger: false,
-    onAuth(auth, session, callback) {
-      assert.ok(session.secure, "SMTP authentication requires TLS");
+  mail = createHttpServer((request, response) => {
+    let raw = "";
+    request.on("data", (chunk) => {
+      raw += chunk;
+    });
+    request.on("end", () => {
+      const reply = (status, body) => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(body));
+      };
       if (
-        auth.username !== "fixture-user" ||
-        auth.password !== "fixture-password"
+        request.method !== "POST" ||
+        request.url !== "/emails" ||
+        request.headers.authorization !== "Bearer fixture-key"
       )
-        return callback(new Error("Invalid fixture credentials"));
-      callback(null, { user: "fixture-user" });
-    },
-    onRcptTo(address, session, callback) {
-      if (address.address !== "leads@example.test")
-        return callback(new Error("Unexpected recipient"));
-      callback();
-    },
-    onData(stream, session, callback) {
-      let raw = "";
-      stream.on("data", (chunk) => {
-        raw += chunk.toString();
+        return reply(401, { message: "Invalid fixture credentials" });
+      assert.ok(
+        request.headers["idempotency-key"],
+        "Each lead carries an idempotency key",
+      );
+      if (rejectLead) return reply(422, { message: "Synthetic refusal" });
+      if (omitMessageId) return reply(200, {});
+      const body = JSON.parse(raw);
+      const [attachment] = body.attachments;
+      assert.equal(attachment.filename, "lead.xml");
+      received.push({
+        raw,
+        to: body.to,
+        from: body.from,
+        xml: Buffer.from(attachment.content, "base64").toString("utf8"),
       });
-      stream.on("end", () => {
-        if (rejectLead)
-          return callback(
-            Object.assign(new Error("Synthetic refusal"), {
-              responseCode: 451,
-            }),
-          );
-        assert.ok(session.secure);
-        const encoded = raw.match(
-          /Content-Type: application\/xml[^]*?Content-Transfer-Encoding: base64[^]*?\r\n\r\n([^]*?)\r\n--/i,
-        )?.[1];
-        assert.ok(
-          encoded,
-          "ADF uses the specification's application/xml MIME part",
-        );
-        received.push({
-          raw,
-          xml: Buffer.from(encoded.replace(/\s/g, ""), "base64").toString(
-            "utf8",
-          ),
-          envelope: session.envelope,
-        });
-        callback(null, "Queued synthetic fixture");
-      });
-    },
+      reply(200, { id: "fixture-message-id" });
+    });
   });
-  await new Promise((resolve) => smtp.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => mail.listen(0, "127.0.0.1", resolve));
   async function stopApp() {
     if (app && app.exitCode === null) {
       const exited = new Promise((resolve) => app.once("exit", resolve));
@@ -137,13 +96,10 @@ try {
         PORT: String(port),
         SITE_URL: origin,
         SITE_INDEXABLE: "false",
-        NODE_EXTRA_CA_CERTS: cert,
         DATABASE_URL: databaseUrl,
-        SMTP_HOST: "localhost",
-        SMTP_PORT: String(smtp.server.address().port),
-        SMTP_USER: "fixture-user",
-        SMTP_PASSWORD: "fixture-password",
-        SMTP_FROM: "website@example.test",
+        RESEND_API_URL: `http://127.0.0.1:${mail.address().port}/emails`,
+        RESEND_API_KEY: "fixture-key",
+        RESEND_FROM: "website@example.test",
         ADF_LEAD_TO: "leads@example.test",
         ...overrides,
       },
@@ -238,9 +194,8 @@ try {
     const receipt = await response.json();
     const email = received.at(-1);
     assert.ok(email.xml.includes(receipt.reference));
-    assert.equal(email.envelope.rcptTo.length, 1);
-    assert.equal(email.envelope.rcptTo[0].address, "leads@example.test");
-    assert.equal(email.envelope.mailFrom.address, "website@example.test");
+    assert.deepEqual(email.to, ["leads@example.test"]);
+    assert.ok(email.from.includes("<website@example.test>"));
     assert.ok(
       !email.raw.includes("attacker@example.test") &&
         !email.xml.includes("Forged vehicle"),
@@ -352,35 +307,34 @@ try {
     );
   }
   await page.close();
-  origin = await startApp({ SMTP_PASSWORD: "" });
+  origin = await startApp({ RESEND_API_KEY: "" });
   assert.equal(
     (await submit(lead)).status,
     503,
-    "Missing SMTP credentials must not claim delivery",
+    "Missing email credentials must not claim delivery",
   );
-  origin = await startApp({ SMTP_PASSWORD: "incorrect" });
+  origin = await startApp({ RESEND_API_KEY: "incorrect" });
   assert.equal(
     (await submit(lead)).status,
     502,
-    "Failed SMTP authentication must not claim delivery",
+    "A rejected API key must not claim delivery",
   );
-  smtp.options.disabledCommands.push("AUTH");
-  smtp.options.authOptional = true;
+  omitMessageId = true;
   origin = await startApp();
-  const beforeAuthless = received.length;
+  const beforeUnconfirmed = received.length;
   assert.equal(
     (await submit(lead)).status,
     502,
-    "A TLS relay without AUTH must not receive a lead",
+    "A response without a message id must not claim delivery",
   );
-  assert.equal(received.length, beforeAuthless);
+  assert.equal(received.length, beforeUnconfirmed);
   assert.ok(
     !logs.includes(lead.email) &&
       !logs.includes(lead.message) &&
-      !logs.includes("fixture-password"),
+      !logs.includes("fixture-key"),
   );
   console.log(
-    "PASS: inventory fixtures; all six inquiry types as authenticated TLS ADF email; recipient isolation, validation, rejected delivery, missing credentials, XML parsing and log redaction; provider iframe, retired native endpoint, responsive layout and accessibility.",
+    "PASS: inventory fixtures; all six inquiry types as authenticated Resend ADF email; recipient isolation, validation, rejected delivery, missing credentials, XML parsing and log redaction; provider iframe, retired native endpoint, responsive layout and accessibility.",
   );
 } finally {
   if (browser) await browser.close();
@@ -389,7 +343,6 @@ try {
     app.kill("SIGTERM");
     await exited;
   }
-  if (smtp) await new Promise((resolve) => smtp.close(resolve));
+  if (mail) await new Promise((resolve) => mail.close(resolve));
   await db?.end();
-  await rm(dir, { recursive: true, force: true });
 }
