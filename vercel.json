@@ -1,3 +1,9 @@
 {
-  "crons": [{ "path": "/api/cron/inventory", "schedule": "15 * * * *" }]
+  "buildCommand": "node scripts/vercel-build.mjs",
+  "crons": [
+    {
+      "path": "/api/cron/inventory",
+      "schedule": "15 * * * *"
+    }
+  ]
 }

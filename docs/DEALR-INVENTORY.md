@@ -26,13 +26,13 @@ Drop `--input` to download the S3 object instead (needs `S3_*`, `AWS_*` and the 
 
 ## Production connection
 
-Production runs on Vercel with a Neon Postgres database. `vercel.json` schedules `GET /api/cron/inventory` at 15 minutes past every hour. Vercel sends `Authorization: Bearer $CRON_SECRET`; the route returns 401 for anything else, and for everyone if `CRON_SECRET` is unset. Hourly crons need a Vercel Pro plan.
+Production runs on Vercel with a Neon Postgres database. `vercel.json` schedules `GET /api/cron/inventory` at 15 minutes past every hour. Vercel sends `Authorization: Bearer $CRON_SECRET`; the route returns 401 for anything else, and for everyone if `CRON_SECRET` is unset. Hourly crons need a Vercel Pro plan: Hobby is limited to one run per day and rejects an hourly schedule at deploy time. Vercel Cron sends a GET to the production deployment, does not follow redirects (so the production domain must not redirect `/api/cron/inventory`), does not retry a failed run, and may occasionally deliver a run twice; the import is idempotent and locked, so duplicates are harmless.
 
-1. Set `DATABASE_URL` (Neon's pooled connection string). Production Vercel builds apply `db/schema.sql` automatically (the `vercel-build` script runs `scripts/migrate.ts`, which is idempotent); locally run `npm run db:migrate`.
+1. Set `DATABASE_URL` (Neon's pooled connection string). Production Vercel builds apply `db/schema.sql` automatically (`scripts/vercel-build.mjs` runs `scripts/migrate.ts`, which is idempotent); locally run `npm run db:migrate`.
 2. Set `CRON_SECRET` to a long random value.
 3. Set `DEALR_FEED_MODE=full` (complete active-inventory exports; delta feeds are unsupported), `SITE_URL` (final HTTPS origin) and `DEALR_DEALER_ID=452833` (the CSV's DealerID).
 4. Set `S3_BUCKET_NAME`, `S3_INVENTORY_KEY` (`FruitStand/theusedcarfactoryinventory.csv`; the bucket also holds a stray `FruitStandtheusedcarfactoryinventory.csv` and `FruitStand/hello.txt` that must not be used), `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Set `AWS_REGION` explicitly to the bucket region (`us-east-2`); Vercel presets it to the function region. The IAM user needs only `s3:GetObject` on the object and `s3:ListBucket` on the bucket.
-5. The `vercel-build` script (which Vercel runs instead of `build`) runs `scripts/check-env.mjs` first. On a production build (`VERCEL_ENV=production`) it fails if any of the variables above is missing, `DEALR_FEED_MODE` is not `full` or `SITE_URL` is not https. Other environments are not checked. SMTP variables are not checked because inquiry forms fail honestly without them.
+5. `vercel.json` sets `buildCommand` to `scripts/vercel-build.mjs`, which runs `scripts/check-env.mjs` first. On a production build (`VERCEL_ENV=production`) it fails if any of the variables above is missing, `DEALR_FEED_MODE` is not `full` or `SITE_URL` is not https. Other environments are not checked. SMTP variables are not checked because inquiry forms fail honestly without them.
 6. Alert on cron failures (non-200 from the route) and on stale data; see below.
 
 The same code runs from a terminal with `npm run inventory:import` (needs `tsx`, so install with `npm ci`, not `--omit=dev`) for manual runs or a host crontab.
