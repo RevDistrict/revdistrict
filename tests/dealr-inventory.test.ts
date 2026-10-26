@@ -132,6 +132,21 @@ test("stale and future live exports are rejected; preview records stay explicitl
   );
 });
 
+test("comma-joined photo URLs from the live export become separate images in order", () => {
+  // CSV quoting keeps the commas inside the PhotoURL cell, as in the live export.
+  const joined = fixture.replace(
+    /https:\/\/[^,|"]*\|https:\/\/[^,"]*/,
+    (photos) => `"${photos.replaceAll("|", ",")}"`,
+  );
+  assert.ok(!joined.includes("w=1600|"));
+  const [car] = parseDealrInventory(joined, options).vehicles;
+  assert.equal(car.images.length, 3);
+  assert.deepEqual(
+    car.images,
+    parseDealrInventory(fixture, options).vehicles[0].images,
+  );
+});
+
 test("the CLI requires explicit full-feed confirmation", () => {
   const unconfirmed = spawnSync(
     process.execPath,

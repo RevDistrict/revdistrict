@@ -155,7 +155,8 @@ export function parseDealrInventory(csv: string, options: ImportOptions) {
         .replace(/^-|-$/g, "")
         .slice(0, 200);
     const images = get("PhotoURL")
-      .split(/[|\r\n]+/)
+      // The live export joins photos with commas; split only where the next URL starts, since a URL may contain commas.
+      .split(/[|\r\n]+|,\s*(?=https?:\/\/)/i)
       .map((url) => url.trim())
       .filter(Boolean);
     for (const image of images) {
