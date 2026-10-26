@@ -476,15 +476,9 @@ h2 .gold {
   border: 0;
 }
 .featured-grid {
-  grid-template-columns: 1.18fr 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 25px;
   align-items: start;
-}
-.featured-grid .vehicle-card:nth-child(2) {
-  margin-top: 56px;
-}
-.featured-grid .vehicle-card:nth-child(3) {
-  margin-top: 112px;
 }
 .featured-grid .vehicle-card-image {
   aspect-ratio: 1.13;
@@ -938,10 +932,6 @@ h2 .gold {
     min-width: 0;
     scroll-snap-align: center;
   }
-  .featured-grid .vehicle-card:nth-child(2),
-  .featured-grid .vehicle-card:nth-child(3) {
-    margin-top: 0;
-  }
   .featured-grid .vehicle-card-image {
     aspect-ratio: 1.1;
   }
@@ -1109,12 +1099,6 @@ h2 .gold {
   }
   .story-copy h2 {
     font-size: clamp(43px, 4.4vw, 72px);
-  }
-  .featured-grid .vehicle-card:nth-child(2) {
-    margin-top: 28px;
-  }
-  .featured-grid .vehicle-card:nth-child(3) {
-    margin-top: 56px;
   }
   .desktop-nav {
     gap: 22px;
