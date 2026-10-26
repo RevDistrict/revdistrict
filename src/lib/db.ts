@@ -4,7 +4,7 @@ import { attachDatabasePool } from "@vercel/functions";
 
 let pool: pg.Pool | undefined;
 export function getPool() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = process.env.RD_DATABASE_URL;
   if (!connectionString) return undefined;
   if (!pool) {
     // Short idle timeout plus attachDatabasePool closes idle connections before Vercel suspends the instance.

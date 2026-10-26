@@ -71,7 +71,9 @@ export async function downloadInventory() {
 }
 
 async function saveInventory(snapshot: z.infer<typeof inventorySchema>) {
-  const client = new pg.Client({ connectionString: required("DATABASE_URL") });
+  const client = new pg.Client({
+    connectionString: required("RD_DATABASE_URL"),
+  });
   await client.connect();
   try {
     await client.query("BEGIN");

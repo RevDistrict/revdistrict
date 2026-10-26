@@ -96,7 +96,7 @@ try {
         PORT: String(port),
         SITE_URL: origin,
         SITE_INDEXABLE: "false",
-        DATABASE_URL: databaseUrl,
+        RD_DATABASE_URL: databaseUrl,
         RESEND_API_URL: `http://127.0.0.1:${mail.address().port}/emails`,
         RESEND_API_KEY: "fixture-key",
         RESEND_FROM: "website@example.test",

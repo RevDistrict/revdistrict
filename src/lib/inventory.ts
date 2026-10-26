@@ -7,7 +7,7 @@ import { assertInventoryFresh } from "./dealr-inventory";
 export const getInventory = cache(async () => {
   await connection();
   const pool = getPool();
-  if (!pool) throw new Error("DATABASE_URL is not configured.");
+  if (!pool) throw new Error("RD_DATABASE_URL is not configured.");
   const [meta, rows] = await Promise.all([
     pool.query<{ captured_at: Date }>("SELECT captured_at FROM inventory_meta"),
     pool.query<{ data: unknown }>("SELECT data FROM vehicles ORDER BY id"),

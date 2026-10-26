@@ -50,7 +50,7 @@ try {
   await db.connect();
   await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");
   await run(process.execPath, ["--import", "tsx", "scripts/migrate.ts"], {
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: { ...process.env, RD_DATABASE_URL: databaseUrl },
   });
   const vehicleIds = async () =>
     (await db.query("SELECT id FROM vehicles ORDER BY id")).rows.map(
@@ -60,7 +60,7 @@ try {
     ...process.env,
     SITE_URL: "https://dealer.example",
     SITE_INDEXABLE: "false",
-    DATABASE_URL: databaseUrl,
+    RD_DATABASE_URL: databaseUrl,
     DEALR_FEED_MODE: "full",
     DEALR_DEALER_ID: "demo-dealer",
     CRON_SECRET: "fixture-cron-secret",

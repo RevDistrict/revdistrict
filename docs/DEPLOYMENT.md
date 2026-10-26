@@ -1,6 +1,6 @@
 # Hosting
 
-**Update:** the site is planned for Vercel with a Neon Postgres database; Namecheap remains the domain registrar and DNS host. The hourly inventory import is a Vercel Cron job (`vercel.json`, `/api/cron/inventory` at :15), which requires a Pro plan. See [the inventory handoff](DEALR-INVENTORY.md) for the environment variables, including `DATABASE_URL`, `CRON_SECRET`, `S3_*`, `AWS_*` (set `AWS_REGION` explicitly) and `DEALR_DEALER_ID`.
+**Update:** the site is planned for Vercel with a Neon Postgres database; Namecheap remains the domain registrar and DNS host. The hourly inventory import is a Vercel Cron job (`vercel.json`, `/api/cron/inventory` at :15), which requires a Pro plan. See [the inventory handoff](DEALR-INVENTORY.md) for the environment variables, including `RD_DATABASE_URL`, `CRON_SECRET`, `S3_*`, `AWS_*` (set `AWS_REGION` explicitly) and `DEALR_DEALER_ID`.
 
 The Namecheap/cPanel notes below are a fallback only. A cPanel host can run `server.cjs`, but it has no Vercel Cron: schedule `npm run inventory:import` with the host's cron and keep `tsx` installed (`npm ci`).
 
@@ -14,12 +14,12 @@ Namecheap documents custom Next.js servers under cPanel's **Setup Node.js App**:
 
 ```sh
 npm ci
-npm run db:migrate   # DATABASE_URL pointing at a local Postgres
+npm run db:migrate   # RD_DATABASE_URL pointing at a local Postgres
 npm run inventory:import -- --input tests/fixtures/dealr-inventory.csv   # see DEALR-INVENTORY.md
 npm run dev
 ```
 
-Open http://localhost:3000. `DATABASE_URL` is required: with no database or no import, inventory pages show the error state. Forms will not claim delivery without configured Resend delivery.
+Open http://localhost:3000. `RD_DATABASE_URL` is required: with no database or no import, inventory pages show the error state. Forms will not claim delivery without configured Resend delivery.
 
 ## Production build
 

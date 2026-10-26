@@ -2,7 +2,7 @@
 if (process.env.VERCEL_ENV !== "production") process.exit(0);
 
 const required = [
-  "DATABASE_URL",
+  "RD_DATABASE_URL",
   "CRON_SECRET",
   "SITE_URL",
   "DEALR_DEALER_ID",

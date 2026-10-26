@@ -7,7 +7,7 @@ npm ci
 npm run dev
 ```
 
-Set `DATABASE_URL` to a local Postgres, run `npm run db:migrate`, then import inventory (see [the importer handoff](docs/DEALR-INVENTORY.md)). Open **http://localhost:3000**. Start with home → inventory → Acura Integra → gallery → request a test drive. Also review financing, sell/trade, contact, and the story page at phone width.
+Set `RD_DATABASE_URL` to a local Postgres, run `npm run db:migrate`, then import inventory (see [the importer handoff](docs/DEALR-INVENTORY.md)). Open **http://localhost:3000**. Start with home → inventory → Acura Integra → gallery → request a test drive. Also review financing, sell/trade, contact, and the story page at phone width.
 
 The homepage now prioritizes inventory, financing and consignment. On-site routes include a consignment consultation, text-back request, and dealr.cloud’s embedded credit application at the existing `/financing/apply` route. Desktop sections are more compact and the gold accent is closer to the original logo.
 
@@ -37,7 +37,7 @@ npm audit --audit-level=high
 npm run test:e2e
 ```
 
-Browser tests expect the app on localhost:3000 serving the 262-vehicle legacy fixture: run `npm run test:e2e:seed` (same `TEST_DATABASE_URL` rule as below), then start the app with `DATABASE_URL` set to that test database and `SITE_URL` unset. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` for a different installed Chromium path; on other systems use a Playwright-installed browser and adjust the launch setting. `TEST_BASE_URL` selects an alternate running environment. No tests send production leads.
+Browser tests expect the app on localhost:3000 serving the 262-vehicle legacy fixture: run `npm run test:e2e:seed` (same `TEST_DATABASE_URL` rule as below), then start the app with `RD_DATABASE_URL` set to that test database and `SITE_URL` unset. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` for a different installed Chromium path; on other systems use a Playwright-installed browser and adjust the launch setting. `TEST_BASE_URL` selects an alternate running environment. No tests send production leads.
 
 Integration tests require Chromium and the compiled build. On Linux, run `npx playwright install --with-deps chromium` first; CI does this automatically. The inventory and integration checks also need `TEST_DATABASE_URL`, a throwaway Postgres database whose name ends in `_test` (their tables are dropped). They seed that database, start an authenticated STARTTLS mail fixture and temporary app process, verify every inquiry type and the iframe wrapper, then clean up. The provider iframe is intercepted in automated tests; no live applications or emails are submitted. Screenshot reviews are reproducible with `scripts/visual-review.mjs`, `scripts/motion-review.mjs`, `scripts/interior-motion-review.mjs` and `scripts/performance-review.mjs` against the running site.
 

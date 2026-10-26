@@ -3,8 +3,9 @@ import pg from "pg";
 
 async function main() {
   // Neon recommends a direct (unpooled) connection for schema changes.
-  const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-  if (!url) throw new Error("Missing DATABASE_URL.");
+  const url =
+    process.env.RD_DATABASE_URL_UNPOOLED || process.env.RD_DATABASE_URL;
+  if (!url) throw new Error("Missing RD_DATABASE_URL.");
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {
@@ -16,6 +17,6 @@ async function main() {
 }
 
 main().catch(() => {
-  console.error("Migration failed. Check DATABASE_URL and database access.");
+  console.error("Migration failed. Check RD_DATABASE_URL and database access.");
   process.exit(1);
 });

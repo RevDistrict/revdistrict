@@ -19,7 +19,7 @@ Sources, checked September 23, 2026:
 
 ### What is implemented
 
-`src/lib/inventory.ts` reads the `vehicles` and `inventory_meta` tables (`db/schema.sql`) through a server-only Postgres pool (`DATABASE_URL`). Every record is validated with the Zod contract in `src/lib/vehicle.ts`. A missing `DATABASE_URL`, an empty database or data older than 72 hours raises the page's designed error state; nothing is substituted.
+`src/lib/inventory.ts` reads the `vehicles` and `inventory_meta` tables (`db/schema.sql`) through a server-only Postgres pool (`RD_DATABASE_URL`). Every record is validated with the Zod contract in `src/lib/vehicle.ts`. A missing `RD_DATABASE_URL`, an empty database or data older than 72 hours raises the page's designed error state; nothing is substituted.
 
 **The normalized vehicle contract is ours. It is not a claimed dealr.cloud API schema.** `src/lib/inventory-import.ts` downloads the CSV from S3, maps its columns into that contract (`src/lib/dealr-inventory.ts`) and syncs the database. It runs from the `/api/cron/inventory` route (Vercel Cron, hourly) or from `npm run inventory:import`. See [the importer handoff](DEALR-INVENTORY.md). No undocumented private API or marketplace scraper is used.
 
