@@ -65,11 +65,7 @@ export function DriveSelector({ vehicles }: { vehicles: Vehicle[] }) {
             <br />
             <span data-sheen>frequency.</span>
           </h2>
-          <p>
-            Something that makes you feel something.
-            <br />
-            Start with your kind of drive.
-          </p>
+          <p>Start with your kind of drive.</p>
           <span className="drive-caption mono">
             SELECT A MOOD. MEET YOUR MATCH.
           </span>

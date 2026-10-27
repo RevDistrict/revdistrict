@@ -472,9 +472,9 @@ button:active,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   margin-top: 18px;
-  padding: 16px 0;
+  padding: 0 0 16px;
   gap: 10px;
 }
 .vehicle-card-bottom .mono > span {
@@ -2389,7 +2389,7 @@ button:active,
   }
   .vehicle-card-bottom {
     flex-wrap: nowrap;
-    padding: 15px 0 0;
+    padding: 0 0 15px;
     margin-top: 14px;
   }
   .vehicle-card-bottom strong {
