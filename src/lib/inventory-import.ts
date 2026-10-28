@@ -80,14 +80,15 @@ async function saveInventory(snapshot: z.infer<typeof inventorySchema>) {
     await client.query("SELECT pg_advisory_xact_lock(7101)");
     const ids = snapshot.vehicles.map((v) => v.id);
     // One statement, and unchanged rows are skipped so a no-op import writes nothing.
-    await client.query(
+    const upserted = await client.query(
       `INSERT INTO vehicles (id, status, data, updated_at)
        SELECT v.id, v.status, v.data, now()
        FROM jsonb_to_recordset($1::jsonb) AS v(id text, status text, data jsonb)
        ON CONFLICT (id) DO UPDATE
          SET status = EXCLUDED.status, data = EXCLUDED.data, updated_at = now()
          WHERE vehicles.status IS DISTINCT FROM EXCLUDED.status
-            OR vehicles.data IS DISTINCT FROM EXCLUDED.data`,
+            OR vehicles.data IS DISTINCT FROM EXCLUDED.data
+       RETURNING id`,
       [
         JSON.stringify(
           snapshot.vehicles.map((v) => ({
@@ -99,13 +100,17 @@ async function saveInventory(snapshot: z.infer<typeof inventorySchema>) {
       ],
     );
     // The CSV is the only source of truth: anything it no longer lists is removed.
-    await client.query("DELETE FROM vehicles WHERE NOT (id = ANY($1))", [ids]);
+    const removed = await client.query(
+      "DELETE FROM vehicles WHERE NOT (id = ANY($1))",
+      [ids],
+    );
     await client.query(
       `INSERT INTO inventory_meta (singleton, captured_at) VALUES (true, $1)
        ON CONFLICT (singleton) DO UPDATE SET captured_at = $1`,
       [snapshot.capturedAt],
     );
     await client.query("COMMIT");
+    return (upserted.rowCount ?? 0) + (removed.rowCount ?? 0) > 0;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     throw error;
@@ -128,10 +133,11 @@ export async function syncInventory(source: {
     dealerId: required("DEALR_DEALER_ID"),
     legacyVehicles: legacy.vehicles,
   });
-  await saveInventory(snapshot);
+  const changed = await saveInventory(snapshot);
   return {
     event: "inventory.imported",
     vehicles: snapshot.vehicles.length,
     capturedAt: snapshot.capturedAt,
+    changed,
   };
 }

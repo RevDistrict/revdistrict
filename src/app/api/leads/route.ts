@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createHash, randomUUID } from "node:crypto";
 import { leadSchema, rateLimit } from "@/lib/leads";
 import { adfDeliveryConfig, deliverAdfLead } from "@/lib/adf-delivery";
-import { getInventory } from "@/lib/inventory";
+import { getVehicle } from "@/lib/inventory";
 import type { Vehicle } from "@/lib/vehicle";
 export const runtime = "nodejs";
 const reply = (body: object, status: number) =>
@@ -79,9 +79,7 @@ export async function POST(request: NextRequest) {
     let vehicle: Vehicle | undefined;
     if (result.data.vehicleId) {
       try {
-        vehicle = (await getInventory()).vehicles.find(
-          (v) => v.id === result.data.vehicleId,
-        );
+        vehicle = await getVehicle(result.data.vehicleId);
       } catch {
         // Preserve the inquiry if inventory is unavailable, with only the requested ID.
       }

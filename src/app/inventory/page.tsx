@@ -2,8 +2,7 @@ import { Motion } from "@/components/motion";
 import type { Metadata } from "next";
 import { AmbientFilm } from "@/components/ambient-film";
 import { Suspense } from "react";
-import { toVehicleSummary } from "@/lib/vehicle";
-import { getInventory } from "@/lib/inventory";
+import { getVehicleSummaries } from "@/lib/inventory";
 import { InventoryBrowser } from "@/components/inventory-browser";
 export const metadata: Metadata = {
   title: "Find your next drive",
@@ -11,7 +10,7 @@ export const metadata: Metadata = {
     "Explore used cars, trucks, SUVs and performance cars at RevDistrict in Midvale, Utah.",
 };
 export default async function InventoryPage() {
-  const data = await getInventory();
+  const data = await getVehicleSummaries();
   return (
     <>
       <section
@@ -39,7 +38,7 @@ export default async function InventoryPage() {
       </section>
       <section className="section inventory-section">
         <Suspense fallback={<p>Loading your collection...</p>}>
-          <InventoryBrowser vehicles={data.vehicles.map(toVehicleSummary)} />
+          <InventoryBrowser vehicles={data.vehicles} />
         </Suspense>
       </section>
       <Motion />

@@ -48,3 +48,4 @@ playwright/.cache/
 ._*
 Thumbs.db
 Desktop.ini
+.vercel

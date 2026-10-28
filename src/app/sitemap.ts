@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
-import { getInventory } from "@/lib/inventory";
+import { getVehicleSummaries } from "@/lib/inventory";
 import { vehicleHref } from "@/lib/vehicle";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!process.env.SITE_URL) return [];
   const base = process.env.SITE_URL;
-  const data = await getInventory();
+  const data = await getVehicleSummaries();
   return [
     ...[
       "",

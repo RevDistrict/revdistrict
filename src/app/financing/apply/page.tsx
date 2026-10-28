@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getInventory } from "@/lib/inventory";
+import { getVehicle } from "@/lib/inventory";
 import { site } from "@/lib/site";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -17,9 +17,7 @@ export default async function ApplyPage({
   let selected: { name: string } | undefined;
   if (query.entry_id) {
     try {
-      selected = (await getInventory()).vehicles.find(
-        (v) => v.id === query.entry_id,
-      );
+      selected = await getVehicle(query.entry_id);
     } catch {
       /* An inventory outage must not prevent an application. */
     }

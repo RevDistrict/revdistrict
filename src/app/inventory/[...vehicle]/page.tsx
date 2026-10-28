@@ -9,8 +9,8 @@ import {
   MessageSquare,
   Check,
 } from "lucide-react";
-import { getInventory } from "@/lib/inventory";
-import { vehicleHref, toVehicleSummary } from "@/lib/vehicle";
+import { getVehicle, getVehicleSummaries } from "@/lib/inventory";
+import { vehicleHref } from "@/lib/vehicle";
 import { money, number, site } from "@/lib/site";
 import { VehicleGallery } from "@/components/vehicle-gallery";
 import { VehicleActions } from "@/components/vehicle-actions";
@@ -21,8 +21,7 @@ import { ButtonLink } from "@/components/ui";
 type Props = { params: Promise<{ vehicle: string[] }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vehicle } = await params;
-  const data = await getInventory();
-  const v = data.vehicles.find((item) => item.id === vehicle.at(-1));
+  const v = await getVehicle(vehicle.at(-1) ?? "");
   if (!v) return { title: "Vehicle not found" };
   return {
     title: v.name,
@@ -33,12 +32,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 export default async function VehiclePage({ params }: Props) {
   const { vehicle } = await params;
-  const data = await getInventory();
-  const v = data.vehicles.find((item) => item.id === vehicle.at(-1));
+  const v = await getVehicle(vehicle.at(-1) ?? "");
   if (!v) notFound();
   if (vehicle.join("/") !== v.slug + "/" + v.id)
     permanentRedirect(vehicleHref(v));
-  const similar = data.vehicles
+  const similar = (await getVehicleSummaries()).vehicles
     .filter((item) => item.id !== v.id && item.body === v.body)
     .sort((a, b) => Math.abs(a.price - v.price) - Math.abs(b.price - v.price))
     .slice(0, 3);
@@ -222,7 +220,7 @@ export default async function VehiclePage({ params }: Props) {
         </div>
         <div className="vehicle-grid">
           {similar.map((item) => (
-            <VehicleCard key={item.id} vehicle={toVehicleSummary(item)} />
+            <VehicleCard key={item.id} vehicle={item} />
           ))}
         </div>
       </section>

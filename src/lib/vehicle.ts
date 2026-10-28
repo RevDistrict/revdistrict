@@ -74,13 +74,3 @@ export function monthlyPayment(
     : (principal * rate * Math.pow(1 + rate, months)) /
         (Math.pow(1 + rate, months) - 1);
 }
-
-export function toVehicleSummary(vehicle: Vehicle) {
-  return {
-    ...vehicle,
-    images: vehicle.images.slice(0, 1),
-    photoCount: vehicle.images.length,
-    description: [],
-    equipment: {},
-  };
-}
