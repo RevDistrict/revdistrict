@@ -5,7 +5,7 @@ import { createServer as createHttpServer } from "node:http";
 import pg from "pg";
 import { testDatabaseUrl } from "./test-database-url.mjs";
 import { createServer as createTcpServer } from "node:net";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 
 // All submitted data and email destinations are isolated local fixtures.
@@ -30,6 +30,8 @@ try {
     status: "active",
   };
   const databaseUrl = testDatabaseUrl();
+  // Cached inventory from an earlier run (e.g. test:inventory) outlives its server.
+  await rm(".next/cache/fetch-cache", { recursive: true, force: true });
   db = new pg.Client({ connectionString: databaseUrl });
   await db.connect();
   await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { execFile, spawn } from "node:child_process";
@@ -48,6 +48,8 @@ try {
   await new Promise((resolve) => s3.listen(0, "127.0.0.1", resolve));
   await new Promise((resolve) => resend.listen(0, "127.0.0.1", resolve));
   await db.connect();
+  // Cached inventory from an earlier run (e.g. test:integrations) outlives its server.
+  await rm(".next/cache/fetch-cache", { recursive: true, force: true });
   await db.query("DROP TABLE IF EXISTS vehicles, inventory_meta");
   await run(process.execPath, ["--import", "tsx", "scripts/migrate.ts"], {
     env: { ...process.env, RD_DATABASE_URL: databaseUrl },
