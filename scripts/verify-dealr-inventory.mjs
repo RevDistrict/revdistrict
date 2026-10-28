@@ -170,7 +170,8 @@ try {
     );
   }
   contents = Buffer.from(fixture.toString().replace("31,990", "30,990"));
-  await importCsv();
+  // Only the cron route clears the page cache, so the refresh goes through it.
+  assert.equal((await fetch(cron, { headers: authorization })).status, 200);
   assert.ok(
     (await (await fetch(origin + detailPath)).text()).includes("30,990"),
     "Price updates without rebuilding",
@@ -178,7 +179,7 @@ try {
   // A later export that omits DEMO001 removes it from the site entirely.
   const lines = fixture.toString().split("\n");
   contents = Buffer.from([lines[0], lines[3]].join("\n"));
-  await importCsv();
+  assert.equal((await fetch(cron, { headers: authorization })).status, 200);
   assert.deepEqual(await vehicleIds(), ["DEMO002"]);
   const removed = await fetch(origin + detailPath);
   const removedHtml = await removed.text();
