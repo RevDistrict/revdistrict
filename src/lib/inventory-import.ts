@@ -79,12 +79,25 @@ async function saveInventory(snapshot: z.infer<typeof inventorySchema>) {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7101)");
     const ids = snapshot.vehicles.map((v) => v.id);
-    for (const v of snapshot.vehicles)
-      await client.query(
-        `INSERT INTO vehicles (id, status, data, updated_at) VALUES ($1, $2, $3, now())
-         ON CONFLICT (id) DO UPDATE SET status = $2, data = $3, updated_at = now()`,
-        [v.id, v.status, v],
-      );
+    // One statement, and unchanged rows are skipped so a no-op import writes nothing.
+    await client.query(
+      `INSERT INTO vehicles (id, status, data, updated_at)
+       SELECT v.id, v.status, v.data, now()
+       FROM jsonb_to_recordset($1::jsonb) AS v(id text, status text, data jsonb)
+       ON CONFLICT (id) DO UPDATE
+         SET status = EXCLUDED.status, data = EXCLUDED.data, updated_at = now()
+         WHERE vehicles.status IS DISTINCT FROM EXCLUDED.status
+            OR vehicles.data IS DISTINCT FROM EXCLUDED.data`,
+      [
+        JSON.stringify(
+          snapshot.vehicles.map((v) => ({
+            id: v.id,
+            status: v.status,
+            data: v,
+          })),
+        ),
+      ],
+    );
     // The CSV is the only source of truth: anything it no longer lists is removed.
     await client.query("DELETE FROM vehicles WHERE NOT (id = ANY($1))", [ids]);
     await client.query(
