@@ -30,7 +30,7 @@ export const vehicleSchema = z.object({
   mpgCity: z.string().max(20),
   mpgHighway: z.string().max(20),
   images: z.array(httpsUrl).max(150),
-  description: z.array(z.string().max(15000)).max(40),
+  description: z.array(z.string().max(15000)).max(200),
   equipment: z.record(z.string(), z.array(z.string().max(1000)).max(500)),
   carfaxUrl: httpsUrl.nullable(),
   sourceUrl: httpsUrl,
