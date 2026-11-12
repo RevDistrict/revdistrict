@@ -38,6 +38,7 @@ export function SiteFooter() {
       <div className="footer-bottom">
         <span>© {new Date().getFullYear()} RevDistrict</span>
         <span className="rebrand-note">Rooted in Midvale, Utah.</span>
+        <Link href="/terms">Terms &amp; Conditions</Link>
         <Link href="/privacy-policy">Privacy Policy</Link>
         <a
           href={site.instagram}
